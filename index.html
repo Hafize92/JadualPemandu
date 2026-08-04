@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="ms">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Jadual Pemandu</title>
+    <meta
+      name="description"
+      content="Rekod live penggunaan kereta projek, jadual pemandu, dashboard penyelia, dan dashboard admin."
+    >
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">JP</span>
+          <div>
+            <h1>Jadual Pemandu</h1>
+            <p>Rekod penggunaan kereta projek jabatan</p>
+          </div>
+        </div>
+
+        <div class="auth-card" id="authPanel" aria-live="polite"></div>
+      </header>
+
+      <nav class="tabs" aria-label="Paparan utama">
+        <button class="tab is-active" type="button" data-view="calendarView">Kalendar</button>
+        <button class="tab" type="button" data-view="supervisorView">Dashboard Penyelia</button>
+        <button class="tab" type="button" data-view="adminView">Dashboard Admin</button>
+      </nav>
+
+      <main>
+        <section class="view is-active" id="calendarView" aria-labelledby="calendarTitle">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Paparan pengguna</span>
+              <h2 id="calendarTitle">Kalendar Penggunaan Kereta</h2>
+            </div>
+            <p>
+              Pengguna boleh menyemak kekosongan dan merujuk penyelia kenderaan
+              berkaitan sebelum membuat permohonan.
+            </p>
+          </div>
+
+          <div class="toolbar" aria-label="Penapis kalendar">
+            <label>
+              Tarikh
+              <input type="date" id="filterDate">
+            </label>
+            <label>
+              Kenderaan
+              <select id="filterVehicle">
+                <option value="">Semua kenderaan</option>
+              </select>
+            </label>
+            <label>
+              Carian
+              <input type="search" id="filterSearch" placeholder="Pemandu, destinasi, projek">
+            </label>
+            <button class="ghost-button" type="button" id="clearFilters">Kosongkan</button>
+          </div>
+
+          <div class="summary-grid" id="calendarSummary"></div>
+
+          <div class="content-grid">
+            <section class="panel" aria-labelledby="vehicleStatusTitle">
+              <div class="panel-heading">
+                <h3 id="vehicleStatusTitle">Status Kenderaan</h3>
+                <span id="syncStatus" class="sync-pill">Demo</span>
+              </div>
+              <div class="vehicle-list" id="vehicleStatusList"></div>
+            </section>
+
+            <section class="panel wide-panel" aria-labelledby="scheduleTableTitle">
+              <div class="panel-heading">
+                <h3 id="scheduleTableTitle">Jadual</h3>
+                <span id="recordCount" class="muted-text"></span>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Kenderaan</th>
+                      <th>Pemandu</th>
+                      <th>Penyelia</th>
+                      <th>Destinasi</th>
+                      <th>Mula</th>
+                      <th>Selesai</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="scheduleRows"></tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="supervisorView" aria-labelledby="supervisorTitle">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Akses penyelia</span>
+              <h2 id="supervisorTitle">Dashboard Penyelia</h2>
+            </div>
+            <p>
+              Penyelia mengisi maklumat penggunaan kereta untuk kenderaan yang
+              dipertanggungjawabkan.
+            </p>
+          </div>
+
+          <div class="gate-message" id="supervisorGate"></div>
+
+          <div class="dashboard-grid" id="supervisorDashboard">
+            <section class="panel" aria-labelledby="supervisorVehiclesTitle">
+              <div class="panel-heading">
+                <h3 id="supervisorVehiclesTitle">Kenderaan Di Bawah Penyelia</h3>
+              </div>
+              <div class="vehicle-list compact" id="supervisorVehicleList"></div>
+            </section>
+
+            <section class="panel" aria-labelledby="usageFormTitle">
+              <div class="panel-heading">
+                <h3 id="usageFormTitle">Maklumat Penggunaan Kereta</h3>
+                <button class="ghost-button small" type="button" id="resetBookingForm">Rekod Baru</button>
+              </div>
+              <form class="form-grid" id="bookingForm">
+                <input type="hidden" id="bookingId">
+                <label class="full">
+                  Model & No Pendaftaran Kenderaan
+                  <select id="bookingVehicle" required></select>
+                </label>
+                <label>
+                  Nama Pemandu
+                  <input type="text" id="bookingDriver" required>
+                </label>
+                <label>
+                  Destinasi
+                  <input type="text" id="bookingDestination" required>
+                </label>
+                <label>
+                  Tarikh dan Masa Guna
+                  <input type="datetime-local" id="bookingStart" required>
+                </label>
+                <label>
+                  Tarikh dan Masa Selesai
+                  <input type="datetime-local" id="bookingEnd" required>
+                </label>
+                <label class="full">
+                  Catatan
+                  <textarea id="bookingNotes" rows="3" placeholder="Tujuan perjalanan, nombor rujukan, atau maklumat tambahan"></textarea>
+                </label>
+                <button class="primary-button full" type="submit">Simpan Penggunaan</button>
+              </form>
+            </section>
+
+            <section class="panel wide-panel" aria-labelledby="supervisorRecordsTitle">
+              <div class="panel-heading">
+                <h3 id="supervisorRecordsTitle">Rekod Penyelia</h3>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Kenderaan</th>
+                      <th>Pemandu</th>
+                      <th>Destinasi</th>
+                      <th>Mula</th>
+                      <th>Selesai</th>
+                      <th>Tindakan</th>
+                    </tr>
+                  </thead>
+                  <tbody id="supervisorRows"></tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="adminView" aria-labelledby="adminTitle">
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow">Akses admin</span>
+              <h2 id="adminTitle">Dashboard Admin</h2>
+            </div>
+            <p>
+              Admin mengurus kenderaan, projek, kontrak, PIC, penyelia, kapasiti,
+              dan akses pengguna.
+            </p>
+          </div>
+
+          <div class="gate-message" id="adminGate"></div>
+
+          <div class="dashboard-grid" id="adminDashboard">
+            <section class="panel wide-panel" aria-labelledby="adminSummaryTitle">
+              <div class="panel-heading">
+                <h3 id="adminSummaryTitle">Ringkasan Admin</h3>
+              </div>
+              <div class="summary-grid in-panel" id="adminSummary"></div>
+            </section>
+
+            <section class="panel" aria-labelledby="vehicleFormTitle">
+              <div class="panel-heading">
+                <h3 id="vehicleFormTitle">Maklumat Kenderaan Projek</h3>
+                <button class="ghost-button small" type="button" id="resetVehicleForm">Rekod Baru</button>
+              </div>
+              <form class="form-grid" id="vehicleForm">
+                <input type="hidden" id="vehicleId">
+                <label>
+                  Model Kenderaan
+                  <input type="text" id="vehicleModel" required>
+                </label>
+                <label>
+                  No Pendaftaran
+                  <input type="text" id="vehicleRegistration" required>
+                </label>
+                <label>
+                  Nama Projek
+                  <input type="text" id="vehicleProject" required>
+                </label>
+                <label>
+                  No Kontrak
+                  <input type="text" id="vehicleContract" required>
+                </label>
+                <label>
+                  Nama PIC
+                  <input type="text" id="vehiclePic" required>
+                </label>
+                <label>
+                  Nama Pemandu
+                  <input type="text" id="vehicleDriver" required>
+                </label>
+                <label>
+                  Tarikh Terima Kereta
+                  <input type="date" id="vehicleReceived" required>
+                </label>
+                <label>
+                  Tarikh Siap Projek
+                  <input type="date" id="vehicleProjectDone" required>
+                </label>
+                <label>
+                  Nama Penyelia
+                  <input type="text" id="vehicleSupervisorName" required>
+                </label>
+                <label>
+                  Emel Penyelia
+                  <input type="email" id="vehicleSupervisorEmail" required>
+                </label>
+                <label>
+                  UID Penyelia Firebase
+                  <input type="text" id="vehicleSupervisorId" placeholder="Opsyenal, dari Firebase Auth">
+                </label>
+                <label>
+                  Kapasiti
+                  <input type="number" id="vehicleCapacity" min="1" value="4" required>
+                </label>
+                <button class="primary-button full" type="submit">Simpan Kenderaan</button>
+              </form>
+            </section>
+
+            <section class="panel" aria-labelledby="accessFormTitle">
+              <div class="panel-heading">
+                <h3 id="accessFormTitle">Akses Pengguna Firebase</h3>
+              </div>
+              <form class="form-grid" id="userForm">
+                <label class="full">
+                  UID Pengguna
+                  <input type="text" id="userUid" placeholder="UID daripada Firebase Authentication" required>
+                </label>
+                <label>
+                  Nama
+                  <input type="text" id="userName" required>
+                </label>
+                <label>
+                  Emel
+                  <input type="email" id="userEmail" required>
+                </label>
+                <label>
+                  Peranan
+                  <select id="userRole" required>
+                    <option value="viewer">Pengguna</option>
+                    <option value="supervisor">Penyelia</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </label>
+                <label>
+                  Kenderaan Dibenarkan
+                  <input type="text" id="userVehicles" placeholder="ID kenderaan, pisahkan dengan koma">
+                </label>
+                <button class="primary-button full" type="submit">Simpan Akses</button>
+              </form>
+              <div class="helper-note">
+                Password disimpan oleh Firebase Authentication. Jadual ini hanya
+                menyimpan peranan dan kenderaan yang dibenarkan.
+              </div>
+            </section>
+
+            <section class="panel wide-panel" aria-labelledby="adminVehiclesTitle">
+              <div class="panel-heading">
+                <h3 id="adminVehiclesTitle">Senarai Kenderaan</h3>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Kenderaan</th>
+                      <th>Projek</th>
+                      <th>Kontrak</th>
+                      <th>PIC</th>
+                      <th>Penyelia</th>
+                      <th>Kapasiti</th>
+                      <th>Tindakan</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminVehicleRows"></tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="panel wide-panel" aria-labelledby="adminUsersTitle">
+              <div class="panel-heading">
+                <h3 id="adminUsersTitle">Senarai Akses</h3>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Nama</th>
+                      <th>Emel</th>
+                      <th>Peranan</th>
+                      <th>Kenderaan</th>
+                      <th>UID</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminUserRows"></tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="version-pill" aria-label="Versi aplikasi">Hafize | ver1.0.0</div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="firebase-config.js"></script>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,59 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function profile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return signedIn() && profile().role == "admin";
+    }
+
+    function isSupervisor() {
+      return signedIn() && profile().role == "supervisor";
+    }
+
+    function assignedByList(vehicleId) {
+      return profile().allowedVehicleIds is list
+        && vehicleId in profile().allowedVehicleIds;
+    }
+
+    function assignedByVehicle(vehicleId) {
+      let vehicle = get(/databases/$(database)/documents/vehicles/$(vehicleId)).data;
+      return vehicle.supervisorId == request.auth.uid
+        || vehicle.supervisorEmail == request.auth.token.email;
+    }
+
+    function canWriteBooking(vehicleId) {
+      return isAdmin()
+        || (isSupervisor() && (assignedByList(vehicleId) || assignedByVehicle(vehicleId)));
+    }
+
+    match /vehicles/{vehicleId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /bookings/{bookingId} {
+      allow read: if true;
+      allow create: if canWriteBooking(request.resource.data.vehicleId);
+      allow update: if isAdmin()
+        || (
+          isSupervisor()
+          && canWriteBooking(resource.data.vehicleId)
+          && request.resource.data.vehicleId == resource.data.vehicleId
+        );
+      allow delete: if canWriteBooking(resource.data.vehicleId);
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create, update, delete: if isAdmin();
+    }
+  }
+}

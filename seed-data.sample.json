@@ -1,0 +1,61 @@
+{
+  "vehicles": {
+    "hilux-kws-1024": {
+      "model": "Toyota Hilux",
+      "registrationNo": "KWS 1024",
+      "projectName": "Projek Jalan Utama",
+      "contractNo": "KWS/JKR/2026/014",
+      "picName": "Aiman Hakim",
+      "driverName": "Azlan Rahim",
+      "receivedDate": "2026-07-15",
+      "projectReadyDate": "2026-11-01",
+      "supervisorName": "Nur Hafiza",
+      "supervisorEmail": "hafiza@example.com",
+      "supervisorId": "",
+      "capacity": 5
+    },
+    "vios-kws-3388": {
+      "model": "Toyota Vios",
+      "registrationNo": "KWS 3388",
+      "projectName": "Audit Tapak Selatan",
+      "contractNo": "KWS/AUD/2026/006",
+      "picName": "Suresh Kumar",
+      "driverName": "Farid Zain",
+      "receivedDate": "2026-06-22",
+      "projectReadyDate": "2026-11-01",
+      "supervisorName": "Rahman Salleh",
+      "supervisorEmail": "rahman@example.com",
+      "supervisorId": "",
+      "capacity": 4
+    }
+  },
+  "bookings": {
+    "contoh-lawatan-tapak": {
+      "vehicleId": "hilux-kws-1024",
+      "vehicleLabel": "Toyota Hilux (KWS 1024)",
+      "driverName": "Azlan Rahim",
+      "supervisorName": "Nur Hafiza",
+      "supervisorEmail": "hafiza@example.com",
+      "destination": "Tapak Projek Jalan Utama",
+      "startAt": "2026-08-04T08:30",
+      "endAt": "2026-08-04T17:30",
+      "notes": "Lawatan pemantauan kerja tanah."
+    }
+  },
+  "users": {
+    "UID_ADMIN_FIREBASE": {
+      "displayName": "Admin Jadual",
+      "email": "admin@example.com",
+      "role": "admin",
+      "allowedVehicleIds": []
+    },
+    "UID_PENYELIA_FIREBASE": {
+      "displayName": "Nur Hafiza",
+      "email": "hafiza@example.com",
+      "role": "supervisor",
+      "allowedVehicleIds": [
+        "hilux-kws-1024"
+      ]
+    }
+  }
+}
