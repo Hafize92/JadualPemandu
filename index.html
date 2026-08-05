@@ -43,24 +43,6 @@
             </p>
           </div>
 
-          <div class="toolbar" aria-label="Penapis kalendar">
-            <label>
-              Tarikh
-              <input type="date" id="filterDate">
-            </label>
-            <label>
-              Kenderaan
-              <select id="filterVehicle">
-                <option value="">Semua kenderaan</option>
-              </select>
-            </label>
-            <label>
-              Carian
-              <input type="search" id="filterSearch" placeholder="Pemandu, destinasi, projek">
-            </label>
-            <button class="ghost-button" type="button" id="clearFilters">Kosongkan</button>
-          </div>
-
           <div class="summary-grid" id="calendarSummary"></div>
 
           <div class="content-grid">
@@ -75,24 +57,16 @@
             <section class="panel wide-panel" aria-labelledby="scheduleTableTitle">
               <div class="panel-heading">
                 <h3 id="scheduleTableTitle">Jadual</h3>
-                <span id="recordCount" class="muted-text"></span>
+                <div class="calendar-controls" aria-label="Navigasi bulan">
+                  <button class="ghost-button small icon-button" type="button" id="calendarPrev" aria-label="Bulan sebelumnya">&lt;</button>
+                  <span id="calendarMonthLabel" class="month-label"></span>
+                  <button class="ghost-button small icon-button" type="button" id="calendarNext" aria-label="Bulan seterusnya">&gt;</button>
+                  <button class="ghost-button small" type="button" id="calendarToday">Bulan Ini</button>
+                </div>
               </div>
-              <div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Kenderaan</th>
-                      <th>Pemandu</th>
-                      <th>Penyelia</th>
-                      <th>Destinasi</th>
-                      <th>Mula</th>
-                      <th>Selesai</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody id="scheduleRows"></tbody>
-                </table>
-              </div>
+              <div class="calendar-legend" id="calendarLegend"></div>
+              <div class="month-calendar" id="scheduleCalendar" aria-live="polite"></div>
+              <div class="muted-text calendar-count" id="recordCount"></div>
             </section>
           </div>
         </section>
@@ -243,9 +217,10 @@
                   <input type="text" id="vehicleSupervisorName" required>
                 </label>
                 <label>
-                  Emel Penyelia
-                  <input type="email" id="vehicleSupervisorEmail" required>
+                  No. Telefon Penyelia
+                  <input type="tel" id="vehicleSupervisorPhone" placeholder="Contoh: 012-3456789">
                 </label>
+                <input type="hidden" id="vehicleSupervisorEmail">
                 <label>
                   UID Penyelia Firebase
                   <input type="text" id="vehicleSupervisorId" placeholder="Opsyenal, dari Firebase Auth">
@@ -341,7 +316,7 @@
       </main>
     </div>
 
-    <div class="version-pill" aria-label="Versi aplikasi">Hafize | ver1.0.0</div>
+    <div class="version-pill" aria-label="Versi aplikasi">Hafize | ver1.0.1</div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <script src="firebase-config.js"></script>

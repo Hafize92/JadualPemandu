@@ -1,4 +1,4 @@
-const APP_VERSION = "ver1.0.0";
+const APP_VERSION = "ver1.0.1";
 const FIREBASE_SDK_VERSION = "10.12.5";
 
 const demoData = createDemoData();
@@ -21,6 +21,7 @@ const state = {
   bookings: demoData.bookings,
   users: demoData.users,
   activeView: "calendarView",
+  calendarCursor: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
   unsubscribers: [],
   profileUnsubscribe: null,
   usersUnsubscribe: null
@@ -38,15 +39,16 @@ document.addEventListener("DOMContentLoaded", () => {
 function cacheElements() {
   [
     "authPanel",
-    "filterDate",
-    "filterVehicle",
-    "filterSearch",
-    "clearFilters",
     "calendarSummary",
+    "calendarPrev",
+    "calendarNext",
+    "calendarToday",
+    "calendarMonthLabel",
+    "calendarLegend",
     "syncStatus",
     "recordCount",
     "vehicleStatusList",
-    "scheduleRows",
+    "scheduleCalendar",
     "supervisorGate",
     "supervisorDashboard",
     "supervisorVehicleList",
@@ -74,6 +76,7 @@ function cacheElements() {
     "vehicleReceived",
     "vehicleProjectDone",
     "vehicleSupervisorName",
+    "vehicleSupervisorPhone",
     "vehicleSupervisorEmail",
     "vehicleSupervisorId",
     "vehicleCapacity",
@@ -97,14 +100,16 @@ function bindEvents() {
     button.addEventListener("click", () => setActiveView(button.dataset.view));
   });
 
-  ["filterDate", "filterVehicle", "filterSearch"].forEach((id) => {
-    els[id].addEventListener("input", renderCalendar);
+  els.calendarPrev.addEventListener("click", () => {
+    moveCalendarMonth(-1);
   });
 
-  els.clearFilters.addEventListener("click", () => {
-    els.filterDate.value = "";
-    els.filterVehicle.value = "";
-    els.filterSearch.value = "";
+  els.calendarNext.addEventListener("click", () => {
+    moveCalendarMonth(1);
+  });
+
+  els.calendarToday.addEventListener("click", () => {
+    state.calendarCursor = startOfMonth(new Date());
     renderCalendar();
   });
 
@@ -363,12 +368,11 @@ function setDemoRole(role) {
 }
 
 function renderCalendar() {
-  populateVehicleFilter();
   const bookings = filteredBookings();
   const now = new Date();
   const activeCount = state.bookings.filter((booking) => bookingStatus(booking, now).key === "active").length;
   const futureCount = state.bookings.filter((booking) => bookingStatus(booking, now).key === "booked").length;
-  const availableCount = state.vehicles.filter((vehicle) => vehicleAvailability(vehicle.id).key === "free").length;
+  const availableCount = state.vehicles.filter((vehicle) => vehicleAvailability(vehicle.id).key !== "active").length;
 
   els.calendarSummary.innerHTML = [
     summaryCard("Jumlah kenderaan", state.vehicles.length),
@@ -381,64 +385,112 @@ function renderCalendar() {
     ? state.vehicles.map(renderVehicleItem).join("")
     : `<div class="empty-state">Belum ada rekod kenderaan.</div>`;
 
-  els.recordCount.textContent = `${bookings.length} rekod`;
-  els.scheduleRows.innerHTML = bookings.length
-    ? bookings.map(renderScheduleRow).join("")
-    : `<tr><td colspan="7"><div class="empty-state">Tiada jadual sepadan dengan penapis.</div></td></tr>`;
-}
-
-function populateVehicleFilter() {
-  const currentValue = els.filterVehicle.value;
-  const options = [`<option value="">Semua kenderaan</option>`].concat(
-    state.vehicles.map((vehicle) => (
-      `<option value="${escapeAttr(vehicle.id)}">${escapeHtml(vehicleLabel(vehicle))}</option>`
-    ))
-  );
-  els.filterVehicle.innerHTML = options.join("");
-  els.filterVehicle.value = state.vehicles.some((vehicle) => vehicle.id === currentValue) ? currentValue : "";
+  renderScheduleCalendar(bookings);
 }
 
 function filteredBookings() {
-  const selectedDate = els.filterDate.value;
-  const selectedVehicle = els.filterVehicle.value;
-  const search = els.filterSearch.value.trim().toLowerCase();
-
   return state.bookings
-    .filter((booking) => !selectedDate || String(booking.startAt || "").startsWith(selectedDate))
-    .filter((booking) => !selectedVehicle || booking.vehicleId === selectedVehicle)
-    .filter((booking) => {
-      if (!search) return true;
-      const vehicle = findVehicle(booking.vehicleId);
-      const haystack = [
-        vehicleLabel(vehicle),
-        booking.driverName,
-        booking.supervisorName,
-        booking.destination,
-        vehicle?.projectName,
-        vehicle?.contractNo,
-        vehicle?.picName
-      ].join(" ").toLowerCase();
-      return haystack.includes(search);
-    })
     .sort((a, b) => String(a.startAt).localeCompare(String(b.startAt)));
+}
+
+function moveCalendarMonth(offset) {
+  state.calendarCursor = new Date(
+    state.calendarCursor.getFullYear(),
+    state.calendarCursor.getMonth() + offset,
+    1
+  );
+  renderCalendar();
+}
+
+function renderScheduleCalendar(bookings) {
+  const monthStart = startOfMonth(state.calendarCursor);
+  const monthEnd = endOfMonth(monthStart);
+  const gridStart = startOfWeek(monthStart);
+  const gridDays = Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
+  const gridEnd = endOfDay(gridDays[gridDays.length - 1]);
+  const visibleBookings = bookings.filter((booking) => {
+    const start = new Date(booking.startAt);
+    const end = new Date(booking.endAt || booking.startAt);
+    return start <= gridEnd && end >= gridStart;
+  });
+  const monthBookings = bookings.filter((booking) => {
+    const start = new Date(booking.startAt);
+    const end = new Date(booking.endAt || booking.startAt);
+    return start <= endOfDay(monthEnd) && end >= monthStart;
+  });
+
+  els.calendarMonthLabel.textContent = formatMonthYear(monthStart);
+  els.recordCount.textContent = `${monthBookings.length} rekod bulan ini`;
+  els.calendarLegend.innerHTML = state.vehicles.length
+    ? state.vehicles.map((vehicle) => {
+      const color = vehicleColor(vehicle.id);
+      return `
+        <span class="legend-item">
+          <span class="vehicle-color-dot" style="--vehicle-color: ${color}"></span>
+          ${escapeHtml(vehicleLabel(vehicle))}
+        </span>
+      `;
+    }).join("")
+    : "";
+
+  els.scheduleCalendar.innerHTML = `
+    <div class="calendar-weekdays">
+      ${["Isn", "Sel", "Rab", "Kha", "Jum", "Sab", "Aha"].map((day) => `<div>${day}</div>`).join("")}
+    </div>
+    <div class="calendar-grid">
+      ${gridDays.map((day) => renderCalendarDay(day, monthStart, visibleBookings)).join("")}
+    </div>
+  `;
+}
+
+function renderCalendarDay(day, monthStart, bookings) {
+  const dayKey = toDateKey(day);
+  const todayKey = toDateKey(new Date());
+  const dayBookings = bookings.filter((booking) => bookingTouchesDate(booking, day));
+  const classes = [
+    "calendar-day",
+    day.getMonth() !== monthStart.getMonth() ? "is-outside" : "",
+    dayKey === todayKey ? "is-today" : ""
+  ].filter(Boolean).join(" ");
+
+  return `
+    <article class="${classes}" aria-label="${escapeAttr(formatDate(dayKey))}">
+      <div class="calendar-date">${day.getDate()}</div>
+      <div class="calendar-events">
+        ${dayBookings.length ? dayBookings.map(renderCalendarEvent).join("") : ""}
+      </div>
+    </article>
+  `;
+}
+
+function renderCalendarEvent(booking) {
+  const vehicle = findVehicle(booking.vehicleId);
+  const color = vehicleColor(booking.vehicleId || booking.vehicleLabel || booking.id);
+  return `
+    <div class="calendar-event" style="--vehicle-color: ${color}; --vehicle-soft: ${hexToRgba(color, 0.13)}">
+      <strong>${escapeHtml(vehicleLabel(vehicle, booking.vehicleLabel))}</strong>
+      <span>${escapeHtml(booking.driverName || "-")} ke ${escapeHtml(booking.destination || "-")}</span>
+      <span>${formatTime(booking.startAt)} - ${formatTime(booking.endAt)}</span>
+    </div>
+  `;
 }
 
 function renderVehicleItem(vehicle) {
   const availability = vehicleAvailability(vehicle.id);
+  const color = vehicleColor(vehicle.id);
   return `
-    <article class="vehicle-item">
+    <article class="vehicle-item" style="--vehicle-color: ${color}">
       <header>
         <div>
           <div class="vehicle-title">${escapeHtml(vehicleLabel(vehicle))}</div>
-          <div class="vehicle-meta">${escapeHtml(vehicle.projectName || "Tiada nama projek")}</div>
+          <div class="vehicle-meta project-name">${escapeHtml(vehicle.projectName || "Tiada nama projek")}</div>
         </div>
         <span class="status-chip ${availability.key}">${escapeHtml(availability.label)}</span>
       </header>
       <div class="record-meta">
         Penyelia: ${escapeHtml(vehicle.supervisorName || "-")}
-        ${vehicle.supervisorEmail ? `<br>Emel: ${escapeHtml(vehicle.supervisorEmail)}` : ""}
+        <br>No. telefon: ${escapeHtml(vehicle.supervisorPhone || "-")}
         <br>PIC: ${escapeHtml(vehicle.picName || "-")}
-        <br>Siap projek: ${formatDate(vehicle.projectReadyDate)}
       </div>
       <div class="record-meta">${escapeHtml(availability.detail)}</div>
     </article>
@@ -737,6 +789,7 @@ async function handleVehicleSubmit(event) {
     receivedDate: els.vehicleReceived.value,
     projectReadyDate: els.vehicleProjectDone.value,
     supervisorName: els.vehicleSupervisorName.value.trim(),
+    supervisorPhone: els.vehicleSupervisorPhone.value.trim(),
     supervisorEmail: els.vehicleSupervisorEmail.value.trim().toLowerCase(),
     supervisorId: els.vehicleSupervisorId.value.trim(),
     capacity: Number(els.vehicleCapacity.value || 0),
@@ -798,6 +851,7 @@ function fillVehicleForm(vehicle) {
   els.vehicleReceived.value = vehicle.receivedDate || "";
   els.vehicleProjectDone.value = vehicle.projectReadyDate || "";
   els.vehicleSupervisorName.value = vehicle.supervisorName || "";
+  els.vehicleSupervisorPhone.value = vehicle.supervisorPhone || "";
   els.vehicleSupervisorEmail.value = vehicle.supervisorEmail || "";
   els.vehicleSupervisorId.value = vehicle.supervisorId || "";
   els.vehicleCapacity.value = vehicle.capacity || 4;
@@ -905,8 +959,8 @@ function vehicleAvailability(vehicleId) {
   const next = vehicleBookings.find((booking) => new Date(booking.startAt) > now);
   if (next) {
     return {
-      key: "booked",
-      label: "Ditempah",
+      key: "free",
+      label: "Kosong",
       detail: `Tempahan seterusnya ${formatDateTime(next.startAt)}`
     };
   }
@@ -973,8 +1027,8 @@ function formatDateTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
   return new Intl.DateTimeFormat("ms-MY", {
-    day: "2-digit",
-    month: "short",
+    day: "numeric",
+    month: "long",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit"
@@ -986,10 +1040,86 @@ function formatDate(value) {
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return "-";
   return new Intl.DateTimeFormat("ms-MY", {
-    day: "2-digit",
-    month: "short",
+    day: "numeric",
+    month: "long",
     year: "numeric"
   }).format(date);
+}
+
+function formatMonthYear(date) {
+  return new Intl.DateTimeFormat("ms-MY", {
+    month: "long",
+    year: "numeric"
+  }).format(date);
+}
+
+function formatTime(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return new Intl.DateTimeFormat("ms-MY", {
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
+}
+
+function toDateKey(date) {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
+function startOfMonth(date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function endOfMonth(date) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
+}
+
+function startOfWeek(date) {
+  const copy = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const mondayOffset = (copy.getDay() + 6) % 7;
+  copy.setDate(copy.getDate() - mondayOffset);
+  return copy;
+}
+
+function endOfDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+}
+
+function bookingTouchesDate(booking, date) {
+  const start = new Date(booking.startAt);
+  const end = new Date(booking.endAt || booking.startAt);
+  const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const dayEnd = endOfDay(date);
+  return start <= dayEnd && end >= dayStart;
+}
+
+function vehicleColor(seed = "") {
+  const palette = [
+    "#116a5c",
+    "#b44a2f",
+    "#2f65b4",
+    "#8a5a12",
+    "#6b4aa0",
+    "#0f7c8a",
+    "#9b355f",
+    "#4f741f"
+  ];
+  const text = String(seed || "kenderaan");
+  let hash = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = (hash * 31 + text.charCodeAt(index)) % palette.length;
+  }
+  return palette[hash];
+}
+
+function hexToRgba(hex, alpha) {
+  const value = hex.replace("#", "");
+  const red = parseInt(value.slice(0, 2), 16);
+  const green = parseInt(value.slice(2, 4), 16);
+  const blue = parseInt(value.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }
 
 function nowValue() {
@@ -1026,6 +1156,7 @@ function createDemoData() {
       receivedDate: "2026-07-15",
       projectReadyDate: projectDone,
       supervisorName: "Nur Hafiza",
+      supervisorPhone: "012-3456789",
       supervisorEmail: "hafiza@example.com",
       supervisorId: "",
       capacity: 5
@@ -1041,6 +1172,7 @@ function createDemoData() {
       receivedDate: "2026-06-22",
       projectReadyDate: projectDone,
       supervisorName: "Rahman Salleh",
+      supervisorPhone: "013-4567890",
       supervisorEmail: "rahman@example.com",
       supervisorId: "",
       capacity: 4
@@ -1056,6 +1188,7 @@ function createDemoData() {
       receivedDate: "2026-08-01",
       projectReadyDate: projectDone,
       supervisorName: "Mei Lin",
+      supervisorPhone: "014-5678901",
       supervisorEmail: "meilin@example.com",
       supervisorId: "",
       capacity: 7
