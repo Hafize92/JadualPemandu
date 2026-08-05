@@ -1,10 +1,13 @@
-const APP_VERSION = "ver1.0.1";
+const APP_VERSION = "ver1.0.2";
 const FIREBASE_SDK_VERSION = "10.12.5";
 
 const demoData = createDemoData();
 
 const state = {
   firebaseEnabled: false,
+  firebaseConfigured: false,
+  firebaseLoading: true,
+  firebaseError: false,
   firebaseReady: false,
   auth: null,
   db: null,
@@ -32,6 +35,8 @@ const els = {};
 document.addEventListener("DOMContentLoaded", () => {
   cacheElements();
   bindEvents();
+  state.firebaseConfigured = hasFirebaseConfig(window.JADUAL_FIREBASE_CONFIG || {});
+  state.firebaseLoading = state.firebaseConfigured;
   renderAll();
   initFirebase();
 });
@@ -134,6 +139,8 @@ async function initFirebase() {
 
   if (!hasFirebaseConfig(config)) {
     state.firebaseEnabled = false;
+    state.firebaseConfigured = false;
+    state.firebaseLoading = false;
     renderAll();
     return;
   }
@@ -155,6 +162,8 @@ async function initFirebase() {
     state.sdk = { ...firebaseAuth, ...firebaseFirestore };
     state.firebaseEnabled = true;
     state.firebaseReady = true;
+    state.firebaseLoading = false;
+    state.firebaseError = false;
 
     subscribePublicData();
     state.sdk.onAuthStateChanged(state.auth, (user) => {
@@ -165,7 +174,10 @@ async function initFirebase() {
   } catch (error) {
     console.error(error);
     state.firebaseEnabled = false;
-    showToast("Firebase tidak dapat dimuat. Paparan demo digunakan.");
+    state.firebaseReady = false;
+    state.firebaseLoading = false;
+    state.firebaseError = true;
+    showToast("Firebase tidak dapat dimuat. Sila refresh dan cuba lagi.");
     renderAll();
   }
 }
@@ -243,16 +255,35 @@ function subscribeUserProfile(user) {
 }
 
 function setActiveView(viewId) {
-  state.activeView = viewId;
+  if (!canOpenView(viewId)) {
+    state.activeView = "calendarView";
+    showToast(restrictedViewMessage(viewId));
+  } else {
+    state.activeView = viewId;
+  }
+
+  syncActiveView();
+}
+
+function syncActiveView() {
+  if (!canOpenView(state.activeView)) {
+    state.activeView = "calendarView";
+  }
+
   document.querySelectorAll(".tab").forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.view === viewId);
+    const canAccess = canOpenView(button.dataset.view);
+    const restricted = button.dataset.view !== "calendarView";
+    button.hidden = restricted && !canAccess;
+    button.disabled = restricted && !canAccess;
+    button.classList.toggle("is-active", button.dataset.view === state.activeView);
   });
   document.querySelectorAll(".view").forEach((view) => {
-    view.classList.toggle("is-active", view.id === viewId);
+    view.classList.toggle("is-active", view.id === state.activeView);
   });
 }
 
 function renderAll() {
+  syncActiveView();
   renderAuth();
   renderCalendar();
   renderSupervisor();
@@ -260,6 +291,23 @@ function renderAll() {
 }
 
 function renderAuth() {
+  if (!state.firebaseReady && state.firebaseConfigured) {
+    const message = state.firebaseError
+      ? "Login Firebase tidak dapat dimuat. Sila refresh halaman."
+      : "Login Firebase sedang dimuat...";
+    els.authPanel.innerHTML = `
+      <div class="signed-in">
+        <div>
+          <strong>Login</strong>
+          <span class="muted-text">${escapeHtml(message)}</span>
+        </div>
+      </div>
+    `;
+    els.syncStatus.textContent = state.firebaseError ? "Offline" : "Menyambung";
+    els.syncStatus.classList.remove("live");
+    return;
+  }
+
   if (!state.firebaseReady) {
     els.authPanel.innerHTML = `
       <div class="signed-in demo-auth">
@@ -522,7 +570,9 @@ function renderSupervisor() {
   els.supervisorGate.classList.toggle("is-visible", !canAccess);
   els.supervisorGate.textContent = state.firebaseReady
     ? "Sila log masuk sebagai penyelia atau admin untuk mengisi jadual."
-    : "Mod demo: isi firebase-config.js dan log masuk melalui Firebase Authentication untuk menggunakan dashboard penyelia.";
+    : state.firebaseConfigured
+      ? "Login Firebase sedang disediakan. Sila refresh jika mesej ini berterusan."
+      : "Mod demo: isi firebase-config.js dan log masuk melalui Firebase Authentication untuk menggunakan dashboard penyelia.";
 
   if (!canAccess) return;
 
@@ -600,7 +650,9 @@ function renderAdmin() {
   els.adminGate.classList.toggle("is-visible", !canAccess);
   els.adminGate.textContent = state.firebaseReady
     ? "Sila log masuk sebagai admin untuk mengurus keseluruhan jadual."
-    : "Mod demo: dashboard admin aktif selepas Firebase dikonfigurasi dan akaun admin diwujudkan.";
+    : state.firebaseConfigured
+      ? "Login Firebase sedang disediakan. Sila refresh jika mesej ini berterusan."
+      : "Mod demo: dashboard admin aktif selepas Firebase dikonfigurasi dan akaun admin diwujudkan.";
 
   if (!canAccess) return;
 
@@ -668,6 +720,11 @@ async function handleBookingSubmit(event) {
     return;
   }
 
+  if (!isAdmin() && !supervisorVehicles().some((item) => item.id === vehicle.id)) {
+    showToast("Kenderaan ini tidak dipautkan kepada akaun anda.");
+    return;
+  }
+
   const startAt = els.bookingStart.value;
   const endAt = els.bookingEnd.value;
   if (new Date(startAt) >= new Date(endAt)) {
@@ -723,8 +780,17 @@ function handleBookingAction(event) {
   const button = event.target.closest("button[data-action]");
   if (!button) return;
 
+  if (!(isSupervisor() || isAdmin())) {
+    showToast("Akses penyelia diperlukan.");
+    return;
+  }
+
   const booking = state.bookings.find((item) => item.id === button.dataset.id);
   if (!booking) return;
+  if (!canManageBooking(booking)) {
+    showToast("Kenderaan ini tidak dipautkan kepada akaun anda.");
+    return;
+  }
 
   if (button.dataset.action === "edit-booking") {
     els.bookingId.value = booking.id;
@@ -743,6 +809,17 @@ function handleBookingAction(event) {
 }
 
 async function deleteBooking(id) {
+  if (!(isSupervisor() || isAdmin())) {
+    showToast("Akses penyelia diperlukan.");
+    return;
+  }
+
+  const booking = state.bookings.find((item) => item.id === id);
+  if (booking && !canManageBooking(booking)) {
+    showToast("Kenderaan ini tidak dipautkan kepada akaun anda.");
+    return;
+  }
+
   const confirmed = window.confirm("Padam rekod penggunaan ini?");
   if (!confirmed) return;
 
@@ -828,6 +905,11 @@ function handleVehicleAction(event) {
   const button = event.target.closest("button[data-action]");
   if (!button) return;
 
+  if (!isAdmin()) {
+    showToast("Akses admin diperlukan.");
+    return;
+  }
+
   const vehicle = findVehicle(button.dataset.id);
   if (!vehicle) return;
 
@@ -859,6 +941,11 @@ function fillVehicleForm(vehicle) {
 }
 
 async function deleteVehicle(id) {
+  if (!isAdmin()) {
+    showToast("Akses admin diperlukan.");
+    return;
+  }
+
   const confirmed = window.confirm("Padam rekod kenderaan ini? Rekod penggunaan berkaitan tidak dipadam secara automatik.");
   if (!confirmed) return;
 
@@ -993,16 +1080,45 @@ function supervisorVehicles() {
   ));
 }
 
+function canManageBooking(booking) {
+  if (isAdmin()) return true;
+  return supervisorVehicles().some((vehicle) => vehicle.id === booking.vehicleId);
+}
+
+function canOpenView(viewId) {
+  if (viewId === "calendarView") return true;
+  if (viewId === "supervisorView") return isSupervisor() || isAdmin();
+  if (viewId === "adminView") return isAdmin();
+  return false;
+}
+
+function restrictedViewMessage(viewId) {
+  if (viewId === "adminView") {
+    return "Sila log masuk sebagai admin dahulu.";
+  }
+
+  if (viewId === "supervisorView") {
+    return "Sila log masuk sebagai penyelia atau admin dahulu.";
+  }
+
+  return "Akses tidak dibenarkan.";
+}
+
+function hasWritableSession() {
+  return !state.firebaseConfigured || Boolean(state.currentUser);
+}
+
 function currentRole() {
+  if (state.firebaseConfigured && !state.currentUser) return "viewer";
   return state.profile?.role || "viewer";
 }
 
 function isSupervisor() {
-  return currentRole() === "supervisor";
+  return hasWritableSession() && currentRole() === "supervisor";
 }
 
 function isAdmin() {
-  return currentRole() === "admin";
+  return hasWritableSession() && currentRole() === "admin";
 }
 
 function roleLabel(role) {
