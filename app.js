@@ -1,4 +1,4 @@
-const APP_VERSION = "ver1.0.2";
+const APP_VERSION = "ver1.0.3";
 const FIREBASE_SDK_VERSION = "10.12.5";
 
 const demoData = createDemoData();
