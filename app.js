@@ -1,5 +1,5 @@
 import { buildAccessChanges } from "./access-policy.mjs";
-const APP_VERSION = "ver1.3.1";
+const APP_VERSION = "ver1.3.2";
 const ROOT_ADMIN_UID = "Bg6iUrQS9cg4irQ3QAtG5VFDR8E2";
 const ROOT_ADMIN_EMAIL = "mhafize@jkr.gov.my";
 const DEVELOPMENT_PREVIEW = ["localhost", "127.0.0.1", ""].includes(location.hostname) && new URLSearchParams(location.search).get("live") !== "1";
@@ -761,10 +761,8 @@ function renderSupervisorVehicleItem(vehicle) {
           <div class="vehicle-title">${escapeHtml(vehicleLabel(vehicle))}</div>
           <div class="vehicle-meta">${escapeHtml(vehicle.projectName || "-")}</div>
         </div>
-        <span class="role-chip">${escapeHtml(vehicle.contractNo || "Kontrak")}</span>
       </header>
       <div class="record-meta">
-        PIC: ${escapeHtml(vehicle.picName || "-")}<br>
         Pemandu: ${escapeHtml(vehicle.driverName || "-")}<br>
         Terima: ${formatDate(vehicle.receivedDate)}<br>
         Siap projek: ${formatDate(vehicle.projectReadyDate)}
