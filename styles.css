@@ -859,3 +859,11 @@ button, a { touch-action: manipulation; }
   .toast { bottom: calc(88px + env(safe-area-inset-bottom)); }
   input, select, textarea { font-size: 16px; }
 }
+.report-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-bottom: 16px; }
+.report-controls label { display: grid; gap: 6px; flex: 1 1 180px; min-width: 0; }
+.report-controls select, .report-controls input { width: 100%; min-width: 0; }
+.supervisor-report { min-width: 1600px; table-layout: fixed; }
+.supervisor-report th, .supervisor-report td { border: 1px solid #aeb8b7; text-align: center; overflow-wrap: anywhere; }
+.supervisor-report th { background: #dedede; }
+.supervisor-report th:first-child { width: 54px; }
+.supervisor-report .report-weekend td { background: #ececec; }

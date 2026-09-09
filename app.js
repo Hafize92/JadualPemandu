@@ -1,5 +1,6 @@
 import { buildAccessChanges } from "./access-policy.mjs";
-const APP_VERSION = "ver1.3.2";
+import { reportRows, downloadReport } from "./supervisor-report.mjs";
+const APP_VERSION = "ver1.4.0";
 const ROOT_ADMIN_UID = "Bg6iUrQS9cg4irQ3QAtG5VFDR8E2";
 const ROOT_ADMIN_EMAIL = "mhafize@jkr.gov.my";
 const DEVELOPMENT_PREVIEW = ["localhost", "127.0.0.1", ""].includes(location.hostname) && new URLSearchParams(location.search).get("live") !== "1";
@@ -147,6 +148,19 @@ function bindEvents() {
   });
 
   els.bookingForm.addEventListener("submit", handleBookingSubmit);
+  document.getElementById("reportMonth").value = toDateKey(new Date()).slice(0, 7);
+  document.getElementById("reportMonth").addEventListener("change", renderSupervisor);
+  document.getElementById("reportVehicle").addEventListener("change", renderSupervisor);
+  document.getElementById("downloadReport").addEventListener("click", async (event) => {
+    if (!(isAdmin() || isSupervisor())) return;
+    const vehicle = supervisorVehicles().find(v => v.id === document.getElementById("reportVehicle").value);
+    const month = document.getElementById("reportMonth").value;
+    if (!vehicle || !month) { showToast("Pilih kenderaan dan bulan."); return; }
+    event.currentTarget.disabled = true;
+    try { await downloadReport(vehicle, month, reportRows(state.bookings, vehicle.id, month)); }
+    catch (error) { showToast(error.message); }
+    finally { document.getElementById("downloadReport").disabled = false; }
+  });
   els.bookingVehicle.addEventListener("change", () => {
     const vehicle = findVehicle(els.bookingVehicle.value);
     if (vehicle && !els.bookingId.value) {
@@ -744,13 +758,13 @@ function renderSupervisor() {
 
   populateBookingVehicleOptions(vehicles);
 
-  const rows = state.bookings
-    .filter((booking) => isAdmin() || vehicles.some((vehicle) => vehicle.id === booking.vehicleId))
-    .sort((a, b) => String(b.startAt).localeCompare(String(a.startAt)))
-    .map(renderSupervisorRow)
-    .join("");
-
-  els.supervisorRows.innerHTML = rows || `<tr><td colspan="6"><div class="empty-state">Belum ada rekod penggunaan.</div></td></tr>`;
+  const select = document.getElementById("reportVehicle");
+  const selected = select.value;
+  select.innerHTML = vehicles.map(v => `<option value="${escapeAttr(v.id)}">${escapeHtml(vehicleLabel(v))}</option>`).join("");
+  if (vehicles.some(v => v.id === selected)) select.value = selected;
+  const month = document.getElementById("reportMonth").value;
+  const rows = select.value ? reportRows(state.bookings, select.value, month) : [];
+  els.supervisorRows.innerHTML = rows.map(row => `<tr class="${row.weekend ? "report-weekend" : ""}">${row.values.map(value => `<td>${escapeHtml(String(value))}</td>`).join("")}<td>${row.booking ? `<div class="row-actions"><button class="ghost-button small" data-action="edit-booking" data-id="${escapeAttr(row.booking.id)}">Edit</button><button class="danger-button small" data-action="delete-booking" data-id="${escapeAttr(row.booking.id)}">Padam</button></div>` : ""}</td></tr>`).join("") || `<tr><td colspan="12">Pilih kenderaan dan bulan.</td></tr>`;
 }
 
 function renderSupervisorVehicleItem(vehicle) {
@@ -895,6 +909,10 @@ async function handleBookingSubmit(event) {
     vehicleId: vehicle.id,
     vehicleLabel: vehicleLabel(vehicle),
     driverName: els.bookingDriver.value.trim(),
+    userName: document.getElementById("bookingUser").value.trim(),
+    purpose: document.getElementById("bookingPurpose").value.trim(),
+    officerName: document.getElementById("bookingOfficer").value.trim(),
+    mileage: document.getElementById("bookingMileage").value,
     supervisorId: state.currentUser?.uid || vehicle.supervisorId || "",
     supervisorName: state.profile?.displayName || vehicle.supervisorName || "",
     supervisorEmail: state.currentUser?.email || vehicle.supervisorEmail || "",
@@ -955,6 +973,10 @@ function handleBookingAction(event) {
     els.bookingId.value = booking.id;
     els.bookingVehicle.value = booking.vehicleId;
     els.bookingDriver.value = booking.driverName || "";
+    document.getElementById("bookingUser").value = booking.userName || "";
+    document.getElementById("bookingPurpose").value = booking.purpose || "";
+    document.getElementById("bookingOfficer").value = booking.officerName || "";
+    document.getElementById("bookingMileage").value = booking.mileage ?? "";
     els.bookingDestination.value = booking.destination || "";
     els.bookingStart.value = booking.startAt || "";
     els.bookingEnd.value = booking.endAt || "";
