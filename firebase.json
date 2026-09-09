@@ -1,4 +1,5 @@
 {
+  "functions": { "source": "functions", "runtime": "nodejs22" },
   "hosting": {
     "public": ".",
     "ignore": [
@@ -9,7 +10,13 @@
       "firestore.rules",
       "firestore.indexes.json",
       "seed-data.sample.json",
-      ".firebaserc.example"
+      ".firebaserc.example",
+      "functions/**",
+      "scripts/**",
+      "tests/**",
+      "preview-server.cjs",
+      "package*.json",
+      "DEPLOYMENT.md"
     ],
     "rewrites": [
       {

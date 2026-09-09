@@ -11,11 +11,15 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return signedIn() && profile().role == "admin";
+      return signedIn()
+        && request.auth.uid == "Bg6iUrQS9cg4irQ3QAtG5VFDR8E2"
+        && request.auth.token.email == "mhafize@jkr.gov.my";
     }
 
     function isSupervisor() {
-      return signedIn() && profile().role == "supervisor";
+      return signedIn() && profile().role == "supervisor"
+        && profile().get("disabled", false) == false
+        && profile().get("mustChangePassword", false) == false;
     }
 
     function assignedByList(vehicleId) {
@@ -23,15 +27,9 @@ service cloud.firestore {
         && vehicleId in profile().allowedVehicleIds;
     }
 
-    function assignedByVehicle(vehicleId) {
-      let vehicle = get(/databases/$(database)/documents/vehicles/$(vehicleId)).data;
-      return vehicle.supervisorId == request.auth.uid
-        || vehicle.supervisorEmail == request.auth.token.email;
-    }
-
     function canWriteBooking(vehicleId) {
       return isAdmin()
-        || (isSupervisor() && (assignedByList(vehicleId) || assignedByVehicle(vehicleId)));
+        || (isSupervisor() && assignedByList(vehicleId));
     }
 
     match /vehicles/{vehicleId} {
@@ -53,7 +51,12 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
-      allow create, update, delete: if isAdmin();
+      allow write: if false;
+    }
+
+    match /accountAudit/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
     }
   }
 }

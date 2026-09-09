@@ -88,13 +88,13 @@ p {
 }
 
 h1 {
-  font-size: clamp(1.75rem, 2.4vw, 2.55rem);
+  font-size: 28px;
   line-height: 1.08;
   letter-spacing: 0;
 }
 
 h2 {
-  font-size: clamp(1.35rem, 2vw, 2rem);
+  font-size: 24px;
   line-height: 1.15;
   letter-spacing: 0;
 }
@@ -186,7 +186,7 @@ h3 {
   font-size: 0.78rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
 }
 
 .toolbar,
@@ -454,7 +454,7 @@ th {
   color: var(--muted);
   font-size: 0.78rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
 }
 
 td {
@@ -744,4 +744,118 @@ td {
   table {
     min-width: 760px;
   }
+}
+
+/* Compact monthly calendar and touch-first navigation. */
+dialog { width: min(480px, calc(100% - 32px)); max-height: calc(100dvh - 40px); overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 22px; color: var(--ink); }
+dialog::backdrop { background: rgba(0,0,0,.4); }
+dialog .form-grid { padding: 16px 0 0; }
+dialog p { margin: 16px 0; }
+.credential-value { overflow-wrap: anywhere; user-select: all; font-family: monospace; font-size: 18px; }
+.checkbox-label { display: flex; align-items: center; gap: 8px; }
+.checkbox-label input { width: 20px; min-height: 20px; }
+#userVehicles { min-height: 110px; }
+.auth-card { max-width: 520px; }
+.vehicle-calendar-button { width: 100%; text-align: left; color: var(--ink); }
+.vehicle-calendar-button { position: relative; }
+.vehicle-calendar-trigger { border: 0; background: transparent; padding: 0; text-align: left; color: inherit; }
+.vehicle-calendar-trigger::after { content: ""; position: absolute; inset: 0; cursor: pointer; border-radius: 8px; }
+.vehicle-calendar-trigger:focus-visible::after { outline: 2px solid var(--brand); }
+.supervisor-whatsapp { position: relative; z-index: 1; display: inline-flex; align-items: center; min-height: 44px; color: var(--brand-dark); text-decoration: underline; text-underline-offset: 3px; }
+.vehicle-calendar-button:has(.vehicle-calendar-trigger[aria-pressed="true"]) { outline: 2px solid var(--vehicle-color); outline-offset: 1px; }
+.vehicle-calendar-button:hover { border-color: var(--vehicle-color); }
+.vehicle-calendar-button[aria-pressed="true"] { outline: 2px solid var(--vehicle-color); outline-offset: 1px; }
+.vehicle-calendar-button .vehicle-title { display: flex; justify-content: space-between; gap: 8px; }
+.vehicle-open-arrow { font-size: 22px; line-height: 1; color: var(--muted); }
+.vehicle-usage { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.wide-panel > .panel-heading { flex-wrap: wrap; }
+#clearCalendarVehicle[hidden] { display: none; }
+body { background: #f5f6f8; }
+.app-shell { max-width: 1280px; padding-top: 0; }
+.topbar { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--line); }
+.brand { min-height: 96px; padding: 18px 0; border: 0; background: transparent; box-shadow: none; }
+.brand-mark { width: 44px; height: 44px; flex-shrink: 0; }
+.brand p { font-size: 13px; margin-top: 5px; }
+.auth-card { min-height: 0; background: transparent; border: 0; box-shadow: none; padding: 0; }
+.preview-label { font-size: 12px; color: var(--muted); }
+.tabs { border-bottom: 1px solid var(--line); gap: 24px; }
+.tab { background: transparent; border: 0; border-bottom: 3px solid transparent; border-radius: 0; min-height: 48px; }
+.tab.is-active { background: transparent; color: var(--brand); border-color: var(--brand); }
+.section-heading { display: block; margin: 28px 0 20px; }
+.section-heading > p { display: none; }
+.eyebrow { color: var(--muted); font-size: 11px; }
+.summary-grid { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 0; border-block: 1px solid var(--line); padding: 16px 0; margin-bottom: 24px; }
+.summary-card { background: transparent; border: 0; box-shadow: none; min-height: 70px; padding: 4px 16px; border-radius: 0; border-right: 1px solid var(--line); }
+.summary-card:last-child { border: 0; }
+.summary-card strong { font-size: 28px; }
+.summary-card:nth-child(2) strong { color: var(--ok); }
+.summary-card:nth-child(3) strong { color: #b34837; }
+.summary-card:nth-child(4) strong { color: #426bc4; }
+.content-grid { grid-template-columns: minmax(0,1fr) 340px; gap: 28px; }
+.content-grid > .panel:first-child { grid-column: 2; grid-row: 1; }
+.content-grid > .wide-panel { grid-column: 1; grid-row: 1; }
+.panel { background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+.panel-heading { padding: 0 0 16px; min-height: 60px; }
+.vehicle-list { padding: 16px 0; }
+.vehicle-item { background: white; padding: 16px; }
+.vehicle-title { font-size: 15px; }
+.record-meta { line-height: 1.65; overflow-wrap: anywhere; }
+.calendar-controls { gap: 4px; }
+.icon-button { min-width: 44px; min-height: 44px; }
+.month-label { min-width: 132px; font-size: 14px; }
+.calendar-legend { padding: 14px 0; gap: 8px 16px; }
+.legend-item { font-size: 11px; }
+.vehicle-color-dot { flex-shrink: 0; }
+.month-calendar { padding: 0; overflow: visible; }
+.calendar-weekdays, .calendar-grid { min-width: 0; }
+.calendar-grid { grid-auto-rows: 100px; }
+.calendar-day { min-width: 0; min-height: 0; border-top: 0; border-left: 0; border-radius: 0; padding: 6px; text-align: left; color: var(--ink); }
+.calendar-day.is-selected { background: #eaf2ff; box-shadow: inset 0 0 0 2px #426bc4; }
+.calendar-date { margin-bottom: 3px; }
+.calendar-events { gap: 3px; }
+.day-marker { display: block; background: var(--vehicle-color); color: white; border-radius: 3px; padding: 1px 4px; font-size: 10px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.more-events { font-size: 10px; }
+.calendar-count { font-size: 12px; padding: 10px 0; }
+.agenda-heading { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); padding: 18px 0 10px; font-size: 12px; }
+.agenda-item { padding: 12px 16px; border-left: 3px solid var(--vehicle-color); background: white; margin: 8px 0; font-size: 14px; }
+.agenda-item p { margin-top: 4px; }
+button, a { touch-action: manipulation; }
+.version-pill { border: 0; border-radius: 0; font-weight: 400; }
+@media (max-width: 980px) {
+  .content-grid { grid-template-columns: 1fr; }
+  .content-grid > .wide-panel { grid-column: 1; grid-row: 1; }
+  .content-grid > .panel:first-child { grid-column: 1; grid-row: 2; }
+  #vehicleStatusList { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 600px) {
+  .app-shell { width: calc(100% - 32px); padding-bottom: calc(116px + env(safe-area-inset-bottom)); }
+  .topbar { align-items: start; flex-direction: column; padding-bottom: 12px; gap: 0; }
+  .brand { padding: 16px 0 8px; min-height: 0; gap: 12px; }
+  h1 { font-size: 21px; }
+  h2 { font-size: 22px; }
+  .brand p { font-size: 11px; }
+  .preview-label { font-size: 10px; }
+  .tabs { position: fixed; bottom: 0; left: 0; right: 0; z-index: 25; margin: 0; background: white; display: grid; grid-template-columns: repeat(3,1fr); gap: 0; border-top: 1px solid var(--line); padding: 0 12px calc(22px + env(safe-area-inset-bottom)); }
+  .tab { border-bottom: 0; border-top: 3px solid transparent; min-height: 54px; font-size: 13px; }
+  .section-heading { margin: 20px 0 16px; }
+  .summary-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px 0; padding: 14px 0; }
+  .summary-card { padding: 0 12px; min-height: 60px; }
+  .summary-card:nth-child(2) { border-right: 0; }
+  .summary-card span { font-size: 11px; }
+  .summary-card strong { font-size: 26px; }
+  .panel-heading { flex-direction: row; align-items: center; flex-wrap: wrap; }
+  .calendar-controls { width: 100%; justify-content: space-between; flex-wrap: nowrap; }
+  .calendar-weekdays div { padding: 10px 0; font-size: 10px; }
+  .calendar-grid { grid-auto-rows: 62px; }
+  .calendar-day { padding: 3px; }
+  .calendar-date { width: 26px; height: 26px; font-size: 12px; }
+  .calendar-events { display: flex; flex-wrap: wrap; gap: 3px; }
+  .day-marker { width: 7px; height: 7px; padding: 0; border-radius: 50%; }
+  .day-marker span { display: none; }
+  .calendar-legend { gap: 8px 12px; }
+  .legend-item { font-size: 10px; }
+  #vehicleStatusList { grid-template-columns: 1fr; }
+  .version-pill { right: 12px; bottom: calc(3px + env(safe-area-inset-bottom)); font-size: 9px; background: white; padding: 0; }
+  .toast { bottom: calc(88px + env(safe-area-inset-bottom)); }
+  input, select, textarea { font-size: 16px; }
 }

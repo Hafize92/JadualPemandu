@@ -1,4 +1,7 @@
-const APP_VERSION = "ver1.0.3";
+const APP_VERSION = "ver1.2.0";
+const ROOT_ADMIN_UID = "Bg6iUrQS9cg4irQ3QAtG5VFDR8E2";
+const ROOT_ADMIN_EMAIL = "mhafize@jkr.gov.my";
+const DEVELOPMENT_PREVIEW = ["localhost", "127.0.0.1", ""].includes(location.hostname) && new URLSearchParams(location.search).get("live") !== "1";
 const FIREBASE_SDK_VERSION = "10.12.5";
 
 const demoData = createDemoData();
@@ -12,6 +15,7 @@ const state = {
   auth: null,
   db: null,
   sdk: null,
+  functions: null,
   currentUser: null,
   profile: {
     id: "demo-viewer",
@@ -24,6 +28,8 @@ const state = {
   bookings: demoData.bookings,
   users: demoData.users,
   activeView: "calendarView",
+  selectedDate: toDateKey(new Date()),
+  selectedVehicleId: "",
   calendarCursor: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
   unsubscribers: [],
   profileUnsubscribe: null,
@@ -35,10 +41,17 @@ const els = {};
 document.addEventListener("DOMContentLoaded", () => {
   cacheElements();
   bindEvents();
-  state.firebaseConfigured = hasFirebaseConfig(window.JADUAL_FIREBASE_CONFIG || {});
+  state.firebaseConfigured = !DEVELOPMENT_PREVIEW && hasFirebaseConfig(window.JADUAL_FIREBASE_CONFIG || {});
   state.firebaseLoading = state.firebaseConfigured;
+  if (!DEVELOPMENT_PREVIEW) {
+    state.vehicles = [];
+    state.bookings = [];
+    state.users = [];
+    state.profile = null;
+  }
   renderAll();
-  initFirebase();
+  if (!DEVELOPMENT_PREVIEW) initFirebase();
+  setInterval(renderCalendar, 60000);
 });
 
 function cacheElements() {
@@ -90,7 +103,6 @@ function cacheElements() {
     "userUid",
     "userName",
     "userEmail",
-    "userRole",
     "userVehicles",
     "adminVehicleRows",
     "adminUserRows",
@@ -101,6 +113,23 @@ function cacheElements() {
 }
 
 function bindEvents() {
+  els.vehicleStatusList.addEventListener("click", (event) => {
+    const vehicle = event.target.closest("[data-calendar-vehicle]");
+    if (!vehicle) return;
+    state.selectedVehicleId = vehicle.dataset.calendarVehicle;
+    renderCalendar();
+    document.getElementById("scheduleTableTitle").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  document.getElementById("clearCalendarVehicle").addEventListener("click", () => {
+    state.selectedVehicleId = "";
+    renderCalendar();
+  });
+  els.scheduleCalendar.addEventListener("click", (event) => {
+    const day = event.target.closest("[data-date]");
+    if (!day) return;
+    state.selectedDate = day.dataset.date;
+    renderCalendar();
+  });
   document.querySelectorAll(".tab").forEach((button) => {
     button.addEventListener("click", () => setActiveView(button.dataset.view));
   });
@@ -115,6 +144,7 @@ function bindEvents() {
 
   els.calendarToday.addEventListener("click", () => {
     state.calendarCursor = startOfMonth(new Date());
+    state.selectedDate = toDateKey(new Date());
     renderCalendar();
   });
 
@@ -129,6 +159,16 @@ function bindEvents() {
   els.vehicleForm.addEventListener("submit", handleVehicleSubmit);
   els.resetVehicleForm.addEventListener("click", resetVehicleForm);
   els.userForm.addEventListener("submit", handleUserSubmit);
+  document.getElementById("resetUserForm").addEventListener("click", resetUserForm);
+  els.adminUserRows.addEventListener("click", handleUserAction);
+  document.getElementById("closeCredentials").addEventListener("click", () => {
+    document.getElementById("credentialsValue").textContent = "";
+    document.getElementById("credentialsDialog").close();
+  });
+  document.getElementById("credentialsDialog").addEventListener("close", () => { document.getElementById("credentialsValue").textContent = ""; });
+  document.getElementById("passwordForm").addEventListener("submit", handlePasswordChange);
+  document.getElementById("closePasswordDialog").addEventListener("click", () => document.getElementById("passwordDialog").close());
+  document.getElementById("passwordDialog").addEventListener("close", () => document.getElementById("passwordForm").reset());
 
   els.supervisorRows.addEventListener("click", handleBookingAction);
   els.adminVehicleRows.addEventListener("click", handleVehicleAction);
@@ -149,17 +189,20 @@ async function initFirebase() {
     const [
       firebaseApp,
       firebaseAuth,
-      firebaseFirestore
+      firebaseFirestore,
+      firebaseFunctions
     ] = await Promise.all([
       import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-app.js`),
       import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-auth.js`),
-      import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-firestore.js`)
+      import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-firestore.js`),
+      import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-functions.js`)
     ]);
 
     const app = firebaseApp.initializeApp(config);
     state.auth = firebaseAuth.getAuth(app);
     state.db = firebaseFirestore.getFirestore(app);
-    state.sdk = { ...firebaseAuth, ...firebaseFirestore };
+    state.functions = firebaseFunctions.getFunctions(app, "asia-southeast1");
+    state.sdk = { ...firebaseAuth, ...firebaseFirestore, ...firebaseFunctions };
     state.firebaseEnabled = true;
     state.firebaseReady = true;
     state.firebaseLoading = false;
@@ -255,6 +298,12 @@ function subscribeUserProfile(user) {
 }
 
 function setActiveView(viewId) {
+  if (DEVELOPMENT_PREVIEW) {
+    state.activeView = viewId;
+    setDemoRole(viewId === "adminView" ? "admin" : viewId === "supervisorView" ? "supervisor" : "viewer");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
   if (!canOpenView(viewId)) {
     state.activeView = "calendarView";
     showToast(restrictedViewMessage(viewId));
@@ -273,9 +322,10 @@ function syncActiveView() {
   document.querySelectorAll(".tab").forEach((button) => {
     const canAccess = canOpenView(button.dataset.view);
     const restricted = button.dataset.view !== "calendarView";
-    button.hidden = restricted && !canAccess;
-    button.disabled = restricted && !canAccess;
+    button.hidden = false;
+    button.disabled = false;
     button.classList.toggle("is-active", button.dataset.view === state.activeView);
+    button.setAttribute("aria-current", button.dataset.view === state.activeView ? "page" : "false");
   });
   document.querySelectorAll(".view").forEach((view) => {
     view.classList.toggle("is-active", view.id === state.activeView);
@@ -291,6 +341,11 @@ function renderAll() {
 }
 
 function renderAuth() {
+  if (DEVELOPMENT_PREVIEW) {
+    els.authPanel.innerHTML = '<span class="preview-label">Pratonton pembangunan</span>';
+    els.syncStatus.textContent = "Data demo";
+    return;
+  }
   if (!state.firebaseReady && state.firebaseConfigured) {
     const message = state.firebaseError
       ? "Login Firebase tidak dapat dimuat. Sila refresh halaman."
@@ -308,6 +363,11 @@ function renderAuth() {
     return;
   }
 
+  if (!state.firebaseReady && !DEVELOPMENT_PREVIEW) {
+    els.authPanel.textContent = "Sambungan tidak tersedia. Sila muat semula halaman.";
+    els.syncStatus.textContent = "Offline";
+    return;
+  }
   if (!state.firebaseReady) {
     els.authPanel.innerHTML = `
       <div class="signed-in demo-auth">
@@ -372,9 +432,22 @@ function renderAuth() {
       <div class="row-actions">
         <span class="role-chip">${escapeHtml(roleLabel(currentRole()))}</span>
         <button class="ghost-button small" type="button" id="logoutButton">Log Keluar</button>
+        <button class="ghost-button small" type="button" id="changePasswordButton">Tukar Password</button>
       </div>
     </div>
   `;
+
+  document.getElementById("changePasswordButton").addEventListener("click", () => document.getElementById("passwordDialog").showModal());
+  if (state.profile?.mustChangePassword) {
+    const notice = document.createElement("p");
+    notice.textContent = "Tukar password sementara untuk membuka dashboard.";
+    els.authPanel.append(notice);
+  }
+  if (state.profile?.disabled) {
+    const notice = document.createElement("p");
+    notice.textContent = "Akses akaun dinyahaktifkan. Hubungi Admin.";
+    els.authPanel.append(notice);
+  }
 
   document.getElementById("logoutButton").addEventListener("click", async () => {
     await state.sdk.signOut(state.auth);
@@ -412,10 +485,15 @@ function setDemoRole(role) {
     ? null
     : { uid: state.profile.id, email: state.profile.email };
   renderAll();
-  showToast(`Paparan demo: ${roleLabel(role)}.`);
+  if (!DEVELOPMENT_PREVIEW) showToast(`Paparan demo: ${roleLabel(role)}.`);
 }
 
 function renderCalendar() {
+  if (state.selectedVehicleId && !findVehicle(state.selectedVehicleId)) state.selectedVehicleId = "";
+  const selectedVehicle = findVehicle(state.selectedVehicleId);
+  document.getElementById("scheduleTableTitle").textContent = selectedVehicle
+    ? `${selectedVehicle.registrationNo} (${selectedVehicle.model})` : "Jadual";
+  document.getElementById("clearCalendarVehicle").hidden = !selectedVehicle;
   const bookings = filteredBookings();
   const now = new Date();
   const activeCount = state.bookings.filter((booking) => bookingStatus(booking, now).key === "active").length;
@@ -438,6 +516,7 @@ function renderCalendar() {
 
 function filteredBookings() {
   return state.bookings
+    .filter((booking) => !state.selectedVehicleId || booking.vehicleId === state.selectedVehicleId)
     .sort((a, b) => String(a.startAt).localeCompare(String(b.startAt)));
 }
 
@@ -447,6 +526,7 @@ function moveCalendarMonth(offset) {
     state.calendarCursor.getMonth() + offset,
     1
   );
+  state.selectedDate = toDateKey(state.calendarCursor);
   renderCalendar();
 }
 
@@ -470,7 +550,7 @@ function renderScheduleCalendar(bookings) {
   els.calendarMonthLabel.textContent = formatMonthYear(monthStart);
   els.recordCount.textContent = `${monthBookings.length} rekod bulan ini`;
   els.calendarLegend.innerHTML = state.vehicles.length
-    ? state.vehicles.map((vehicle) => {
+    ? state.vehicles.filter((vehicle) => !state.selectedVehicleId || vehicle.id === state.selectedVehicleId).map((vehicle) => {
       const color = vehicleColor(vehicle.id);
       return `
         <span class="legend-item">
@@ -489,6 +569,18 @@ function renderScheduleCalendar(bookings) {
       ${gridDays.map((day) => renderCalendarDay(day, monthStart, visibleBookings)).join("")}
     </div>
   `;
+  const selectedBookings = bookings.filter((booking) => bookingTouchesDate(booking, new Date(`${state.selectedDate}T12:00:00`)));
+  document.getElementById("dayAgenda").innerHTML = `
+    <div class="agenda-heading"><h3>${escapeHtml(formatDate(state.selectedDate))}</h3><span class="muted-text">${selectedBookings.length} perjalanan</span></div>
+    ${selectedBookings.length ? selectedBookings.map((booking) => `
+      <article class="agenda-item" style="--vehicle-color:${vehicleColor(booking.vehicleId)}">
+        <strong>${escapeHtml(vehicleLabel(findVehicle(booking.vehicleId), booking.vehicleLabel))}</strong>
+        <p>${escapeHtml(booking.destination || "-")}</p>
+        <p class="record-meta">Pemandu: ${escapeHtml(booking.driverName || "-")}</p>
+        <p class="record-meta">Penyelia: ${escapeHtml(booking.supervisorName || findVehicle(booking.vehicleId)?.supervisorName || "-")}</p>
+        <p class="record-meta">${formatDateTime(booking.startAt)} &ndash; ${formatDateTime(booking.endAt)}</p>
+      </article>`).join("") : '<div class="empty-state">Tiada perjalanan pada tarikh ini.</div>'}
+  `;
 }
 
 function renderCalendarDay(day, monthStart, bookings) {
@@ -498,16 +590,18 @@ function renderCalendarDay(day, monthStart, bookings) {
   const classes = [
     "calendar-day",
     day.getMonth() !== monthStart.getMonth() ? "is-outside" : "",
-    dayKey === todayKey ? "is-today" : ""
+    dayKey === todayKey ? "is-today" : "",
+    dayKey === state.selectedDate ? "is-selected" : ""
   ].filter(Boolean).join(" ");
 
   return `
-    <article class="${classes}" aria-label="${escapeAttr(formatDate(dayKey))}">
+    <button type="button" class="${classes}" data-date="${dayKey}" aria-pressed="${dayKey === state.selectedDate}" aria-label="${escapeAttr(formatDate(dayKey))}, ${dayBookings.length} perjalanan">
       <div class="calendar-date">${day.getDate()}</div>
       <div class="calendar-events">
-        ${dayBookings.length ? dayBookings.map(renderCalendarEvent).join("") : ""}
+        ${dayBookings.slice(0, 3).map((booking) => `<span class="day-marker" style="--vehicle-color:${vehicleColor(booking.vehicleId)}"><span>${escapeHtml(findVehicle(booking.vehicleId)?.registrationNo || "Kenderaan")}</span></span>`).join("")}
+        ${dayBookings.length > 3 ? `<span class="more-events">+${dayBookings.length - 3}</span>` : ""}
       </div>
-    </article>
+    </button>
   `;
 }
 
@@ -526,23 +620,43 @@ function renderCalendarEvent(booking) {
 function renderVehicleItem(vehicle) {
   const availability = vehicleAvailability(vehicle.id);
   const color = vehicleColor(vehicle.id);
+  const phone = whatsappNumber(vehicle.supervisorPhone);
   return `
-    <article class="vehicle-item" style="--vehicle-color: ${color}">
-      <header>
-        <div>
-          <div class="vehicle-title">${escapeHtml(vehicleLabel(vehicle))}</div>
-          <div class="vehicle-meta project-name">${escapeHtml(vehicle.projectName || "Tiada nama projek")}</div>
-        </div>
-        <span class="status-chip ${availability.key}">${escapeHtml(availability.label)}</span>
-      </header>
-      <div class="record-meta">
-        Penyelia: ${escapeHtml(vehicle.supervisorName || "-")}
-        <br>No. telefon: ${escapeHtml(vehicle.supervisorPhone || "-")}
-        <br>PIC: ${escapeHtml(vehicle.picName || "-")}
-      </div>
-      <div class="record-meta">${escapeHtml(availability.detail)}</div>
+    <article class="vehicle-item vehicle-calendar-button" style="--vehicle-color: ${color}">
+      <button type="button" class="vehicle-title vehicle-calendar-trigger" data-calendar-vehicle="${escapeAttr(vehicle.id)}"
+        aria-pressed="${state.selectedVehicleId === vehicle.id}" aria-label="Lihat kalendar ${escapeAttr(vehicle.registrationNo || vehicle.model)}">
+        ${escapeHtml(vehicle.registrationNo || "-")} (${escapeHtml(vehicle.model || "-")}) <span aria-hidden="true" class="vehicle-open-arrow">&rsaquo;</span>
+      </button>
+      <span class="vehicle-meta">${escapeHtml([vehicle.projectDistrict, vehicle.projectState].filter(Boolean).join(", ") || "Lokasi belum ditetapkan")}</span>
+      <span class="record-meta">Penyelia: ${escapeHtml(vehicle.supervisorName || "-")}<br>No. telefon: ${phone
+        ? `<a class="supervisor-whatsapp" href="https://wa.me/${phone}" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" aria-label="WhatsApp ${escapeAttr(vehicle.supervisorName || "penyelia")}">${escapeHtml(vehicle.supervisorPhone)}</a>`
+        : escapeHtml(vehicle.supervisorPhone || "-")}</span>
+      <span class="vehicle-usage"><span class="record-meta">Status Penggunaan</span><span class="status-chip ${availability.key}">${escapeHtml(availability.label)}</span></span>
+      ${availability.booking ? `
+        <span class="record-meta">${escapeHtml(availability.booking.destination || "-")}</span>
+        <span class="record-meta">${escapeHtml(formatUsageDateTime(availability.booking.startAt))} Bertolak</span>
+        <span class="record-meta">${escapeHtml(formatUsageDateTime(availability.booking.endAt))} Balik</span>
+      ` : `<span class="record-meta">${escapeHtml(availability.detail)}</span>`}
     </article>
   `;
+}
+
+function whatsappNumber(value) {
+  const raw = String(value || "").trim();
+  if (!/^\+?[\d\s()-]+$/.test(raw)) return "";
+  let digits = raw.replace(/\D/g, "");
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (digits.startsWith("0")) digits = `60${digits.slice(1)}`;
+  return /^601\d{8,9}$/.test(digits) ? digits : "";
+}
+
+function formatUsageDateTime(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  const hour = date.getHours();
+  const period = hour < 12 ? "Pagi" : hour < 14 ? "Tengah Hari" : hour < 19 ? "Petang" : "Malam";
+  return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()} - ${hour % 12 || 12}.${String(date.getMinutes()).padStart(2, "0")} ${period}`;
 }
 
 function renderScheduleRow(booking) {
@@ -655,6 +769,8 @@ function renderAdmin() {
       : "Mod demo: dashboard admin aktif selepas Firebase dikonfigurasi dan akaun admin diwujudkan.";
 
   if (!canAccess) return;
+  const selected = [...els.userVehicles.selectedOptions].map(option => option.value);
+  els.userVehicles.innerHTML = state.vehicles.map(vehicle => `<option value="${escapeAttr(vehicle.id)}" ${selected.includes(vehicle.id) ? "selected" : ""}>${escapeHtml(vehicleLabel(vehicle))}</option>`).join("");
 
   const totalCapacity = state.vehicles.reduce((sum, vehicle) => sum + Number(vehicle.capacity || 0), 0);
   els.adminSummary.innerHTML = [
@@ -701,8 +817,8 @@ function renderAdminUserRow(user) {
       <td>${escapeHtml(user.displayName || "-")}</td>
       <td>${escapeHtml(user.email || "-")}</td>
       <td><span class="role-chip">${escapeHtml(roleLabel(user.role))}</span></td>
-      <td>${escapeHtml((user.allowedVehicleIds || []).join(", ") || "-")}</td>
-      <td>${escapeHtml(user.id || "-")}</td>
+      <td>${escapeHtml((user.allowedVehicleIds || []).map(id => vehicleLabel(findVehicle(id), id)).join(", ") || "-")}</td>
+      <td>${user.id === ROOT_ADMIN_UID || user.role === "admin" ? "Admin utama" : `<span>${user.disabled ? "Tidak aktif" : "Aktif"}</span><div class="row-actions"><button type="button" class="ghost-button small" data-user-action="edit" data-id="${escapeAttr(user.id)}">Edit akses</button><button type="button" class="ghost-button small" data-user-action="reset" data-id="${escapeAttr(user.id)}">Hantar emel reset</button></div>`}</td>
     </tr>
   `;
 }
@@ -982,31 +1098,28 @@ async function handleUserSubmit(event) {
   const payload = {
     displayName: els.userName.value.trim(),
     email: els.userEmail.value.trim().toLowerCase(),
-    role: els.userRole.value,
-    allowedVehicleIds: els.userVehicles.value
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean),
-    updatedAt: nowValue()
+    phone: document.getElementById("userPhone").value.trim(),
+    disabled: document.getElementById("userDisabled").checked,
+    allowedVehicleIds: [...els.userVehicles.selectedOptions].map(option => option.value)
   };
 
   try {
     if (state.firebaseReady) {
-      const { doc, serverTimestamp, setDoc } = state.sdk;
-      await setDoc(doc(state.db, "users", uid), {
-        ...payload,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
+      const result = await state.sdk.httpsCallable(state.functions, "manageSupervisor")({ uid, ...payload });
+      if (result.data.temporaryPassword) {
+        document.getElementById("credentialsValue").textContent = result.data.temporaryPassword;
+        document.getElementById("credentialsDialog").showModal();
+      }
     } else {
       const existing = state.users.find((user) => user.id === uid);
       if (existing) {
         Object.assign(existing, payload);
       } else {
-        state.users.push({ id: uid, ...payload });
+        state.users.push({ id: crypto.randomUUID(), ...payload, role: "supervisor" });
       }
     }
 
-    els.userForm.reset();
+    resetUserForm();
     renderAll();
     showToast("Akses pengguna disimpan.");
   } catch (error) {
@@ -1021,6 +1134,57 @@ function summaryCard(label, value) {
       <strong>${escapeHtml(String(value))}</strong>
     </article>
   `;
+}
+
+function resetUserForm() {
+  els.userForm.reset();
+  els.userUid.value = "";
+  document.getElementById("userFormTitle").textContent = "Tambah Penyelia";
+}
+
+async function handleUserAction(event) {
+  const button = event.target.closest("[data-user-action]");
+  if (!button || !isAdmin()) return;
+  const user = state.users.find(item => item.id === button.dataset.id);
+  if (!user || user.id === ROOT_ADMIN_UID || user.role === "admin") return;
+  if (button.dataset.userAction === "edit") {
+    els.userUid.value = user.id;
+    els.userName.value = user.displayName || "";
+    els.userEmail.value = user.email || "";
+    document.getElementById("userPhone").value = user.phone || state.vehicles.find(vehicle => vehicle.supervisorId === user.id)?.supervisorPhone || "";
+    document.getElementById("userDisabled").checked = user.disabled === true;
+    [...els.userVehicles.options].forEach(option => { option.selected = (user.allowedVehicleIds || []).includes(option.value); });
+    document.getElementById("userFormTitle").textContent = "Edit Penyelia";
+    els.userForm.scrollIntoView({ behavior: "smooth", block: "start" });
+  } else if (button.dataset.userAction === "reset") {
+    if (!confirm(`Hantar emel penetapan semula password kepada ${user.email}?`)) return;
+    if (DEVELOPMENT_PREVIEW) { showToast("Pratonton: tiada emel dihantar."); return; }
+    button.disabled = true;
+    try {
+      await state.sdk.sendPasswordResetEmail(state.auth, user.email);
+      showToast("Permintaan emel reset dihantar.");
+    } catch (error) { showToast(readableFirebaseError(error)); }
+    finally { button.disabled = false; }
+  }
+}
+
+async function handlePasswordChange(event) {
+  event.preventDefault();
+  const password = document.getElementById("newPassword").value;
+  if (password !== document.getElementById("confirmPassword").value) { showToast("Pengesahan password tidak sepadan."); return; }
+  const submit = event.submitter;
+  submit.disabled = true;
+  try {
+    if (!DEVELOPMENT_PREVIEW) {
+      const credential = state.sdk.EmailAuthProvider.credential(state.currentUser.email, document.getElementById("currentPassword").value);
+      await state.sdk.reauthenticateWithCredential(state.currentUser, credential);
+      await state.sdk.httpsCallable(state.functions, "changeOwnPassword")({ password });
+      await state.sdk.signOut(state.auth);
+    }
+    document.getElementById("passwordDialog").close();
+    showToast("Password ditukar. Sila log masuk dengan password baharu.");
+  } catch (error) { showToast(readableFirebaseError(error)); }
+  finally { submit.disabled = false; }
 }
 
 function vehicleAvailability(vehicleId) {
@@ -1039,6 +1203,7 @@ function vehicleAvailability(vehicleId) {
     return {
       key: "active",
       label: "Digunakan",
+      booking: active,
       detail: `Sehingga ${formatDateTime(active.endAt)} ke ${active.destination || "-"}`
     };
   }
@@ -1048,6 +1213,7 @@ function vehicleAvailability(vehicleId) {
     return {
       key: "free",
       label: "Kosong",
+      booking: next,
       detail: `Tempahan seterusnya ${formatDateTime(next.startAt)}`
     };
   }
@@ -1070,14 +1236,7 @@ function bookingStatus(booking, now = new Date()) {
 function supervisorVehicles() {
   if (isAdmin()) return state.vehicles;
   const allowed = state.profile?.allowedVehicleIds || [];
-  const uid = state.currentUser?.uid;
-  const email = state.currentUser?.email?.toLowerCase();
-
-  return state.vehicles.filter((vehicle) => (
-    allowed.includes(vehicle.id) ||
-    vehicle.supervisorId === uid ||
-    String(vehicle.supervisorEmail || "").toLowerCase() === email
-  ));
+  return state.vehicles.filter((vehicle) => allowed.includes(vehicle.id));
 }
 
 function canManageBooking(booking) {
@@ -1086,6 +1245,7 @@ function canManageBooking(booking) {
 }
 
 function canOpenView(viewId) {
+  if (DEVELOPMENT_PREVIEW) return ["calendarView", "supervisorView", "adminView"].includes(viewId);
   if (viewId === "calendarView") return true;
   if (viewId === "supervisorView") return isSupervisor() || isAdmin();
   if (viewId === "adminView") return isAdmin();
@@ -1105,7 +1265,7 @@ function restrictedViewMessage(viewId) {
 }
 
 function hasWritableSession() {
-  return !state.firebaseConfigured || Boolean(state.currentUser);
+  return (DEVELOPMENT_PREVIEW || Boolean(state.firebaseReady && state.currentUser)) && !state.profile?.disabled && !state.profile?.mustChangePassword;
 }
 
 function currentRole() {
@@ -1118,7 +1278,7 @@ function isSupervisor() {
 }
 
 function isAdmin() {
-  return hasWritableSession() && currentRole() === "admin";
+  return hasWritableSession() && (DEVELOPMENT_PREVIEW ? currentRole() === "admin" : state.currentUser?.uid === ROOT_ADMIN_UID && state.currentUser?.email?.toLowerCase() === ROOT_ADMIN_EMAIL);
 }
 
 function roleLabel(role) {
@@ -1266,6 +1426,8 @@ function createDemoData() {
       model: "Toyota Hilux",
       registrationNo: "KWS 1024",
       projectName: "Projek Jalan Utama",
+      projectDistrict: "Kuantan",
+      projectState: "Pahang",
       contractNo: "KWS/JKR/2026/014",
       picName: "Aiman Hakim",
       driverName: "Azlan Rahim",
@@ -1282,6 +1444,8 @@ function createDemoData() {
       model: "Toyota Vios",
       registrationNo: "KWS 3388",
       projectName: "Audit Tapak Selatan",
+      projectDistrict: "Johor Bahru",
+      projectState: "Johor",
       contractNo: "KWS/AUD/2026/006",
       picName: "Suresh Kumar",
       driverName: "Farid Zain",
@@ -1298,6 +1462,8 @@ function createDemoData() {
       model: "Perodua Alza",
       registrationNo: "KWS 7710",
       projectName: "Mobilisasi Projek Baharu",
+      projectDistrict: "Seremban",
+      projectState: "Negeri Sembilan",
       contractNo: "KWS/OPS/2026/019",
       picName: "Liyana Rosli",
       driverName: "Hadi Ismail",
@@ -1378,6 +1544,9 @@ function readableFirebaseError(error) {
     "auth/invalid-credential": "Emel atau password tidak sah.",
     "auth/user-not-found": "Akaun tidak ditemui.",
     "auth/wrong-password": "Password tidak sah.",
+    "auth/user-disabled": "Akses akaun dinyahaktifkan. Hubungi Admin.",
+    "auth/too-many-requests": "Terlalu banyak percubaan. Cuba semula sebentar lagi.",
+    "functions/unavailable": "Perkhidmatan pengurusan akaun belum tersedia. Cuba semula kemudian.",
     "permission-denied": "Akses tidak dibenarkan oleh Firestore rules."
   };
   return messages[code] || error?.message || "Ralat tidak dijangka.";

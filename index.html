@@ -2,13 +2,14 @@
 <html lang="ms">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#ffffff">
     <title>Jadual Pemandu</title>
     <meta
       name="description"
       content="Rekod live penggunaan kereta projek, jadual pemandu, dashboard penyelia, dan dashboard admin."
     >
-    <link rel="stylesheet" href="styles.css?v=ver1.0.3">
+    <link rel="stylesheet" href="styles.css?v=ver1.2.0">
   </head>
   <body>
     <div class="app-shell">
@@ -25,9 +26,9 @@
       </header>
 
       <nav class="tabs" aria-label="Paparan utama">
-        <button class="tab is-active" type="button" data-view="calendarView">Kalendar</button>
-        <button class="tab" type="button" data-view="supervisorView">Dashboard Penyelia</button>
-        <button class="tab" type="button" data-view="adminView">Dashboard Admin</button>
+        <button class="tab is-active" type="button" data-view="calendarView">Users</button>
+        <button class="tab" type="button" data-view="supervisorView">Penyelia</button>
+        <button class="tab" type="button" data-view="adminView">Admin</button>
       </nav>
 
       <main>
@@ -35,12 +36,8 @@
           <div class="section-heading">
             <div>
               <span class="eyebrow">Paparan pengguna</span>
-              <h2 id="calendarTitle">Kalendar Penggunaan Kereta</h2>
+              <h2 id="calendarTitle">Jadual Kenderaan</h2>
             </div>
-            <p>
-              Pengguna boleh menyemak kekosongan dan merujuk penyelia kenderaan
-              berkaitan sebelum membuat permohonan.
-            </p>
           </div>
 
           <div class="summary-grid" id="calendarSummary"></div>
@@ -57,6 +54,7 @@
             <section class="panel wide-panel" aria-labelledby="scheduleTableTitle">
               <div class="panel-heading">
                 <h3 id="scheduleTableTitle">Jadual</h3>
+                <button class="ghost-button small" id="clearCalendarVehicle" type="button" hidden>Semua kenderaan</button>
                 <div class="calendar-controls" aria-label="Navigasi bulan">
                   <button class="ghost-button small icon-button" type="button" id="calendarPrev" aria-label="Bulan sebelumnya">&lt;</button>
                   <span id="calendarMonthLabel" class="month-label"></span>
@@ -67,6 +65,7 @@
               <div class="calendar-legend" id="calendarLegend"></div>
               <div class="month-calendar" id="scheduleCalendar" aria-live="polite"></div>
               <div class="muted-text calendar-count" id="recordCount"></div>
+              <div id="dayAgenda" aria-live="polite"></div>
             </section>
           </div>
         </section>
@@ -214,17 +213,14 @@
                 </label>
                 <label>
                   Nama Penyelia
-                  <input type="text" id="vehicleSupervisorName" required>
+                  <input type="text" id="vehicleSupervisorName" readonly>
                 </label>
                 <label>
                   No. Telefon Penyelia
-                  <input type="tel" id="vehicleSupervisorPhone" placeholder="Contoh: 012-3456789">
+                  <input type="tel" id="vehicleSupervisorPhone" readonly>
                 </label>
                 <input type="hidden" id="vehicleSupervisorEmail">
-                <label>
-                  UID Penyelia Firebase
-                  <input type="text" id="vehicleSupervisorId" placeholder="Opsyenal, dari Firebase Auth">
-                </label>
+                <input type="hidden" id="vehicleSupervisorId">
                 <label>
                   Kapasiti
                   <input type="number" id="vehicleCapacity" min="1" value="4" required>
@@ -235,12 +231,12 @@
 
             <section class="panel" aria-labelledby="accessFormTitle">
               <div class="panel-heading">
-                <h3 id="accessFormTitle">Akses Pengguna Firebase</h3>
+                <h3 id="accessFormTitle">Pengurusan Penyelia</h3>
               </div>
               <form class="form-grid" id="userForm">
                 <label class="full">
-                  UID Pengguna
-                  <input type="text" id="userUid" placeholder="UID daripada Firebase Authentication" required>
+                  <input type="hidden" id="userUid">
+                  <strong id="userFormTitle">Tambah Penyelia</strong>
                 </label>
                 <label>
                   Nama
@@ -251,23 +247,17 @@
                   <input type="email" id="userEmail" required>
                 </label>
                 <label>
-                  Peranan
-                  <select id="userRole" required>
-                    <option value="viewer">Pengguna</option>
-                    <option value="supervisor">Penyelia</option>
-                    <option value="admin">Admin</option>
-                  </select>
+                  No. telefon
+                  <input type="tel" id="userPhone" autocomplete="tel">
                 </label>
                 <label>
                   Kenderaan Dibenarkan
-                  <input type="text" id="userVehicles" placeholder="ID kenderaan, pisahkan dengan koma">
+                  <select id="userVehicles" multiple size="4" aria-label="Kenderaan Dibenarkan"></select>
                 </label>
+                <label class="checkbox-label"><input type="checkbox" id="userDisabled">Nyahaktifkan akses</label>
                 <button class="primary-button full" type="submit">Simpan Akses</button>
+                <button class="ghost-button full" type="button" id="resetUserForm">Penyelia Baharu</button>
               </form>
-              <div class="helper-note">
-                Password disimpan oleh Firebase Authentication. Jadual ini hanya
-                menyimpan peranan dan kenderaan yang dibenarkan.
-              </div>
             </section>
 
             <section class="panel wide-panel" aria-labelledby="adminVehiclesTitle">
@@ -304,7 +294,7 @@
                       <th>Emel</th>
                       <th>Peranan</th>
                       <th>Kenderaan</th>
-                      <th>UID</th>
+                      <th>Status / Tindakan</th>
                     </tr>
                   </thead>
                   <tbody id="adminUserRows"></tbody>
@@ -316,10 +306,26 @@
       </main>
     </div>
 
-    <div class="version-pill" aria-label="Versi aplikasi">Hafize | ver1.0.3</div>
+    <dialog id="credentialsDialog" aria-labelledby="credentialsTitle">
+      <h3 id="credentialsTitle">Password sementara penyelia</h3>
+      <p id="credentialsValue" class="credential-value"></p>
+      <p>Penyelia perlu menukar password selepas log masuk pertama.</p>
+      <button type="button" class="primary-button" id="closeCredentials">Tutup</button>
+    </dialog>
+    <dialog id="passwordDialog" aria-labelledby="passwordTitle">
+      <h3 id="passwordTitle">Tukar Password</h3>
+      <form id="passwordForm" class="form-grid">
+        <label class="full">Password semasa<input id="currentPassword" type="password" autocomplete="current-password" required></label>
+        <label class="full">Password baharu<input id="newPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+        <label class="full">Sahkan password baharu<input id="confirmPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+        <button type="submit" class="primary-button">Simpan Password</button>
+        <button type="button" class="ghost-button" id="closePasswordDialog">Batal</button>
+      </form>
+    </dialog>
+    <div class="version-pill" aria-label="Versi aplikasi">Hafize | ver1.2.0</div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="firebase-config.js?v=ver1.0.3"></script>
-    <script type="module" src="app.js?v=ver1.0.3"></script>
+    <script src="firebase-config.js?v=ver1.2.0"></script>
+    <script type="module" src="app.js?v=ver1.2.0"></script>
   </body>
 </html>
