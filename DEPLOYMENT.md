@@ -1,44 +1,36 @@
-# Jadual Pemandu 1.2.0
+# Jadual Pemandu 1.3.0 - Spark
 
-Production: https://jadualpemandu-223c0.web.app
+Uses Firebase Hosting, Authentication email/password and Firestore only.
+No Cloud Functions, service account keys, or billing upgrade is required.
+Hosting predeploy copies only the five public assets to .firebase-public.
 
-The existing Firebase Auth UID for mhafize@jkr.gov.my is the only trusted
-administrator. The browser cannot create or edit role documents directly.
-Account creation, email changes, disabling and vehicle assignments use callable
-Cloud Functions. No service account key belongs in the repository or browser.
+Deploy using an authenticated Firebase CLI:
 
-## Deployment
+```
+firebase deploy --only firestore:rules,hosting --project jadualpemandu-223c0
+```
 
-Requires Firebase project access and the Blaze billing plan for Cloud Functions.
-Use Node.js 22 and an authenticated Cloud Shell or Firebase CLI environment.
+The trusted administrator is the existing mhafize@jkr.gov.my account, UID
+Bg6iUrQS9cg4irQ3QAtG5VFDR8E2. No other account can edit access grants.
+Admin saves grants in access/{email} and assigns vehicles within the app.
+Supervisor registration never grants access by itself: a verified email,
+active grant and matching vehicle assignment are all required by server rules.
+Disabling a grant denies new booking writes even if a session remains logged in.
+Changing the grant email disables the former grant and creates a new approval;
+it does not change or delete the old Authentication account.
 
-1. Install backend dependencies: `npm install --prefix functions`.
-2. Verify the existing admin and migrate vehicle assignments:
-   `node scripts/bootstrap-admin.cjs` (Application Default Credentials required).
-3. Run `npm test --prefix functions`.
-4. Deploy backend and rules before the UI:
-   `firebase deploy --only functions,firestore:rules --project jadualpemandu-223c0`.
-5. Deploy the UI:
-   `firebase deploy --only hosting --project jadualpemandu-223c0`.
-6. Verify admin creation/edit/disable flows and supervisor access on production.
+Supervisors register with their own passwords and explicitly send verification
+emails from the registration form. Existing accounts log in and verify their email.
+Users change their own passwords after reauthentication. Admin can request a
+password reset email, but cannot read or directly set passwords.
 
-Do not deploy the UI alone before the functions are available. Do not upgrade
-billing without the project owner's approval. GitHub pushes do not deploy
-Firebase automatically in this repository.
+Legacy users documents remain read-only and no longer grant supervisor privileges.
+On the first Admin login, existing supervisor profiles are imported into access
+grants without overwriting approvals that already exist. Vehicle ownership is
+checked inside a transaction. Admin must log in once after deployment before
+existing supervisors can edit bookings.
+Spark quotas apply; this deployment never attaches a billing account.
 
-## Accounts
-
-Admin uses Pengurusan Penyelia to create or edit a supervisor and select vehicles.
-Temporary passwords are returned once to the admin, never stored in Firestore.
-The supervisor must change the password through the app before writing bookings.
-Disabling updates both Authentication and the profile checked by Firestore rules.
-Old sessions are revoked on account changes. Existing bookings remain intact.
-Password reset emails are sent only when the admin explicitly clicks and confirms.
-
-Users and vehicles remain in the existing Firebase project. A failed account
-update may leave its profile disabled; the admin should retry that existing row.
-If initial password delivery fails, use the reset-email action on the new row.
-
-Local preview: `node preview-server.cjs`, then http://127.0.0.1:5187.
-Preview data is in-memory only and never writes to Firebase.
-Use `?live=1` locally to inspect the real login UI (subject to Auth domain settings).
+Local preview: node preview-server.cjs then http://127.0.0.1:5187.
+Use ?live=1 for real Firebase login. Preview writes are in-memory only.
+Tests: node tests/access-policy.test.mjs.

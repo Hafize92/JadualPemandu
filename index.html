@@ -9,7 +9,7 @@
       name="description"
       content="Rekod live penggunaan kereta projek, jadual pemandu, dashboard penyelia, dan dashboard admin."
     >
-    <link rel="stylesheet" href="styles.css?v=ver1.2.0">
+    <link rel="stylesheet" href="styles.css?v=ver1.3.0">
   </head>
   <body>
     <div class="app-shell">
@@ -306,11 +306,15 @@
       </main>
     </div>
 
-    <dialog id="credentialsDialog" aria-labelledby="credentialsTitle">
-      <h3 id="credentialsTitle">Password sementara penyelia</h3>
-      <p id="credentialsValue" class="credential-value"></p>
-      <p>Penyelia perlu menukar password selepas log masuk pertama.</p>
-      <button type="button" class="primary-button" id="closeCredentials">Tutup</button>
+    <dialog id="registerDialog" aria-labelledby="registerTitle">
+      <h3 id="registerTitle">Daftar Penyelia</h3>
+      <form id="registerForm" class="form-grid">
+        <label class="full">Emel<input id="registerEmail" type="email" autocomplete="email" required></label>
+        <label class="full">Password<input id="registerPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+        <label class="full">Sahkan password<input id="registerConfirm" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+        <button type="submit" class="primary-button">Daftar &amp; Hantar Pengesahan</button>
+        <button type="button" class="ghost-button" id="closeRegisterDialog">Batal</button>
+      </form>
     </dialog>
     <dialog id="passwordDialog" aria-labelledby="passwordTitle">
       <h3 id="passwordTitle">Tukar Password</h3>
@@ -322,10 +326,10 @@
         <button type="button" class="ghost-button" id="closePasswordDialog">Batal</button>
       </form>
     </dialog>
-    <div class="version-pill" aria-label="Versi aplikasi">Hafize | ver1.2.0</div>
+    <div class="version-pill" aria-label="Versi aplikasi">Hafize | ver1.3.0</div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="firebase-config.js?v=ver1.2.0"></script>
-    <script type="module" src="app.js?v=ver1.2.0"></script>
+    <script src="firebase-config.js?v=ver1.3.0"></script>
+    <script type="module" src="app.js?v=ver1.3.0"></script>
   </body>
 </html>

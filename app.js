@@ -1,4 +1,5 @@
-const APP_VERSION = "ver1.2.0";
+import { buildAccessChanges } from "./access-policy.mjs";
+const APP_VERSION = "ver1.3.0";
 const ROOT_ADMIN_UID = "Bg6iUrQS9cg4irQ3QAtG5VFDR8E2";
 const ROOT_ADMIN_EMAIL = "mhafize@jkr.gov.my";
 const DEVELOPMENT_PREVIEW = ["localhost", "127.0.0.1", ""].includes(location.hostname) && new URLSearchParams(location.search).get("live") !== "1";
@@ -15,7 +16,6 @@ const state = {
   auth: null,
   db: null,
   sdk: null,
-  functions: null,
   currentUser: null,
   profile: {
     id: "demo-viewer",
@@ -161,11 +161,9 @@ function bindEvents() {
   els.userForm.addEventListener("submit", handleUserSubmit);
   document.getElementById("resetUserForm").addEventListener("click", resetUserForm);
   els.adminUserRows.addEventListener("click", handleUserAction);
-  document.getElementById("closeCredentials").addEventListener("click", () => {
-    document.getElementById("credentialsValue").textContent = "";
-    document.getElementById("credentialsDialog").close();
-  });
-  document.getElementById("credentialsDialog").addEventListener("close", () => { document.getElementById("credentialsValue").textContent = ""; });
+  document.getElementById("registerForm").addEventListener("submit", handleRegistration);
+  document.getElementById("closeRegisterDialog").addEventListener("click", () => document.getElementById("registerDialog").close());
+  document.getElementById("registerDialog").addEventListener("close", () => document.getElementById("registerForm").reset());
   document.getElementById("passwordForm").addEventListener("submit", handlePasswordChange);
   document.getElementById("closePasswordDialog").addEventListener("click", () => document.getElementById("passwordDialog").close());
   document.getElementById("passwordDialog").addEventListener("close", () => document.getElementById("passwordForm").reset());
@@ -189,20 +187,17 @@ async function initFirebase() {
     const [
       firebaseApp,
       firebaseAuth,
-      firebaseFirestore,
-      firebaseFunctions
+      firebaseFirestore
     ] = await Promise.all([
       import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-app.js`),
       import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-auth.js`),
-      import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-firestore.js`),
-      import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-functions.js`)
+      import(`https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}/firebase-firestore.js`)
     ]);
 
     const app = firebaseApp.initializeApp(config);
     state.auth = firebaseAuth.getAuth(app);
     state.db = firebaseFirestore.getFirestore(app);
-    state.functions = firebaseFunctions.getFunctions(app, "asia-southeast1");
-    state.sdk = { ...firebaseAuth, ...firebaseFirestore, ...firebaseFunctions };
+    state.sdk = { ...firebaseAuth, ...firebaseFirestore };
     state.firebaseEnabled = true;
     state.firebaseReady = true;
     state.firebaseLoading = false;
@@ -270,7 +265,17 @@ function subscribeUserProfile(user) {
   }
 
   const { collection, doc, onSnapshot } = state.sdk;
-  state.profileUnsubscribe = onSnapshot(doc(state.db, "users", user.uid), (snapshot) => {
+  if (user.uid === ROOT_ADMIN_UID && user.email?.toLowerCase() === ROOT_ADMIN_EMAIL) {
+    state.profile = { id: ROOT_ADMIN_UID, displayName: "Hafize", email: ROOT_ADMIN_EMAIL, role: "admin" };
+    importLegacyAccess().catch(error => showToast(readableFirebaseError(error)));
+    state.usersUnsubscribe = onSnapshot(collection(state.db, "access"), (snapshot) => {
+      state.users = snapshot.docs.map(item => ({ ...item.data(), id: item.id }));
+      renderAdmin();
+    }, error => showToast(readableFirebaseError(error)));
+    return;
+  }
+  if (!user.emailVerified) return;
+  state.profileUnsubscribe = onSnapshot(doc(state.db, "access", user.email.toLowerCase()), (snapshot) => {
     state.profile = snapshot.exists()
       ? { id: snapshot.id, ...snapshot.data() }
       : {
@@ -281,20 +286,31 @@ function subscribeUserProfile(user) {
           allowedVehicleIds: []
         };
 
-    if (state.usersUnsubscribe) {
-      state.usersUnsubscribe();
-      state.usersUnsubscribe = null;
-    }
-
-    if (isAdmin()) {
-      state.usersUnsubscribe = onSnapshot(collection(state.db, "users"), (usersSnapshot) => {
-        state.users = usersSnapshot.docs.map((userDoc) => ({ id: userDoc.id, ...userDoc.data() }));
-        renderAdmin();
-      });
-    }
-
     renderAll();
-  });
+  }, () => { state.profile = null; renderAll(); });
+}
+
+async function importLegacyAccess() {
+  const { collection, getDocs, doc, runTransaction, serverTimestamp } = state.sdk;
+  const legacy = await getDocs(collection(state.db, "users"));
+  const vehicles = await getDocs(collection(state.db, "vehicles"));
+  const byEmail = new Map();
+  for (const row of legacy.docs) {
+    const data = row.data();
+    const email = String(data.email || "").toLowerCase();
+    if (data.role !== "supervisor" || !email || email.includes("/") || email === ROOT_ADMIN_EMAIL) continue;
+    byEmail.set(email, { data, uid: row.id });
+  }
+  for (const [email, { data, uid }] of byEmail) {
+    const ref = doc(state.db, "access", email);
+    await runTransaction(state.db, async tx => {
+      if ((await tx.get(ref)).exists()) return;
+      const currentVehicles = await Promise.all(vehicles.docs.map(v => tx.get(v.ref)));
+      const owned = currentVehicles.filter(v => v.exists() && (v.data().supervisorEmail?.toLowerCase() === email || v.data().supervisorId === uid));
+      tx.set(ref, { email, displayName: data.displayName || email, phone: data.phone || owned[0]?.data().supervisorPhone || "", role: "supervisor", disabled: data.disabled === true, allowedVehicleIds: owned.map(v => v.id), updatedAt: serverTimestamp() });
+      for (const vehicle of owned) tx.update(vehicle.ref, { supervisorEmail: email });
+    });
+  }
 }
 
 function setActiveView(viewId) {
@@ -406,7 +422,15 @@ function renderAuth() {
         </label>
         <button class="primary-button" type="submit">Log Masuk</button>
       </form>
+      <div class="row-actions"><button type="button" class="ghost-button small" id="registerButton">Daftar Penyelia</button><button type="button" class="ghost-button small" id="forgotPasswordButton">Lupa Password</button></div>
     `;
+    document.getElementById("registerButton").addEventListener("click", () => document.getElementById("registerDialog").showModal());
+    document.getElementById("forgotPasswordButton").addEventListener("click", async () => {
+      const input = document.getElementById("loginEmail");
+      if (!input.reportValidity()) return;
+      try { await state.sdk.sendPasswordResetEmail(state.auth, input.value.trim()); showToast("Jika akaun wujud, semak emel reset password."); }
+      catch (error) { showToast(readableFirebaseError(error)); }
+    });
 
     document.getElementById("loginForm").addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -438,9 +462,34 @@ function renderAuth() {
   `;
 
   document.getElementById("changePasswordButton").addEventListener("click", () => document.getElementById("passwordDialog").showModal());
-  if (state.profile?.mustChangePassword) {
+  if (!state.currentUser.emailVerified && state.currentUser.uid !== ROOT_ADMIN_UID) {
     const notice = document.createElement("p");
-    notice.textContent = "Tukar password sementara untuk membuka dashboard.";
+    notice.textContent = "Sahkan emel anda untuk mengakses dashboard penyelia.";
+    els.authPanel.append(notice);
+    const send = document.createElement("button");
+    send.className = "ghost-button small";
+    send.textContent = "Hantar emel pengesahan";
+    send.addEventListener("click", async () => {
+      send.disabled = true;
+      try { await state.sdk.sendEmailVerification(state.currentUser); showToast("Emel pengesahan dihantar."); }
+      catch (error) { showToast(readableFirebaseError(error)); }
+      finally { send.disabled = false; }
+    });
+    const refresh = document.createElement("button");
+    refresh.className = "ghost-button small";
+    refresh.textContent = "Saya sudah sahkan emel";
+    refresh.addEventListener("click", async () => {
+      try {
+        await state.sdk.reload(state.currentUser);
+        await state.currentUser.getIdToken(true);
+        subscribeUserProfile(state.currentUser);
+        renderAll();
+      } catch (error) { showToast(readableFirebaseError(error)); }
+    });
+    els.authPanel.append(send, refresh);
+  } else if ((!state.profile || state.profile.role === "viewer") && state.currentUser.uid !== ROOT_ADMIN_UID) {
+    const notice = document.createElement("p");
+    notice.textContent = "Akses penyelia belum diluluskan oleh Admin.";
     els.authPanel.append(notice);
   }
   if (state.profile?.disabled) {
@@ -1105,17 +1154,20 @@ async function handleUserSubmit(event) {
 
   try {
     if (state.firebaseReady) {
-      const result = await state.sdk.httpsCallable(state.functions, "manageSupervisor")({ uid, ...payload });
-      if (result.data.temporaryPassword) {
-        document.getElementById("credentialsValue").textContent = result.data.temporaryPassword;
-        document.getElementById("credentialsDialog").showModal();
+      const writes = buildAccessChanges(state.users, state.vehicles, uid, payload);
+      const batch = state.sdk.writeBatch(state.db);
+      for (const write of writes) {
+        const { id: ignored, ...data } = write.data;
+        batch.set(state.sdk.doc(state.db, write.collection, write.id), { ...data, updatedAt: state.sdk.serverTimestamp() }, { merge: true });
       }
+      await batch.commit();
     } else {
-      const existing = state.users.find((user) => user.id === uid);
-      if (existing) {
-        Object.assign(existing, payload);
-      } else {
-        state.users.push({ id: crypto.randomUUID(), ...payload, role: "supervisor" });
+      const writes = buildAccessChanges(state.users, state.vehicles, uid, payload);
+      for (const write of writes) {
+        const list = write.collection === "access" ? state.users : state.vehicles;
+        const existing = list.find(item => item.id === write.id);
+        if (existing) Object.assign(existing, write.data);
+        else list.push({ ...write.data, id: write.id });
       }
     }
 
@@ -1178,11 +1230,29 @@ async function handlePasswordChange(event) {
     if (!DEVELOPMENT_PREVIEW) {
       const credential = state.sdk.EmailAuthProvider.credential(state.currentUser.email, document.getElementById("currentPassword").value);
       await state.sdk.reauthenticateWithCredential(state.currentUser, credential);
-      await state.sdk.httpsCallable(state.functions, "changeOwnPassword")({ password });
+      await state.sdk.updatePassword(state.currentUser, password);
       await state.sdk.signOut(state.auth);
     }
     document.getElementById("passwordDialog").close();
     showToast("Password ditukar. Sila log masuk dengan password baharu.");
+  } catch (error) { showToast(readableFirebaseError(error)); }
+  finally { submit.disabled = false; }
+}
+
+async function handleRegistration(event) {
+  event.preventDefault();
+  const email = document.getElementById("registerEmail").value.trim().toLowerCase();
+  const password = document.getElementById("registerPassword").value;
+  if (email === ROOT_ADMIN_EMAIL) { showToast("Admin utama menggunakan akaun sedia ada. Sila log masuk."); return; }
+  if (password !== document.getElementById("registerConfirm").value) { showToast("Password tidak sepadan."); return; }
+  const submit = event.submitter;
+  submit.disabled = true;
+  try {
+    const result = await state.sdk.createUserWithEmailAndPassword(state.auth, email, password);
+    document.getElementById("registerDialog").close();
+    // Registration authenticates the account but never grants supervisor privileges.
+    try { await state.sdk.sendEmailVerification(result.user); showToast("Akaun didaftarkan. Semak emel pengesahan."); }
+    catch { showToast("Akaun didaftarkan. Tekan Hantar emel pengesahan untuk cuba semula."); }
   } catch (error) { showToast(readableFirebaseError(error)); }
   finally { submit.disabled = false; }
 }
@@ -1265,7 +1335,7 @@ function restrictedViewMessage(viewId) {
 }
 
 function hasWritableSession() {
-  return (DEVELOPMENT_PREVIEW || Boolean(state.firebaseReady && state.currentUser)) && !state.profile?.disabled && !state.profile?.mustChangePassword;
+  return (DEVELOPMENT_PREVIEW || Boolean(state.firebaseReady && state.currentUser)) && !state.profile?.disabled;
 }
 
 function currentRole() {
@@ -1274,7 +1344,7 @@ function currentRole() {
 }
 
 function isSupervisor() {
-  return hasWritableSession() && currentRole() === "supervisor";
+  return hasWritableSession() && currentRole() === "supervisor" && (DEVELOPMENT_PREVIEW || state.currentUser.emailVerified);
 }
 
 function isAdmin() {
@@ -1528,7 +1598,7 @@ function createDemoData() {
         allowedVehicleIds: []
       },
       {
-        id: "demo-supervisor",
+        id: "hafiza@example.com",
         displayName: "Nur Hafiza",
         email: "hafiza@example.com",
         role: "supervisor",

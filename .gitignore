@@ -1,5 +1,6 @@
 .firebaserc
 .firebase/
+.firebase-public/
 firebase-debug.log
 *.local
 node_modules/
