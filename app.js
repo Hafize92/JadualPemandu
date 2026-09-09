@@ -1,5 +1,5 @@
 import { buildAccessChanges } from "./access-policy.mjs";
-const APP_VERSION = "ver1.3.0";
+const APP_VERSION = "ver1.3.1";
 const ROOT_ADMIN_UID = "Bg6iUrQS9cg4irQ3QAtG5VFDR8E2";
 const ROOT_ADMIN_EMAIL = "mhafize@jkr.gov.my";
 const DEVELOPMENT_PREVIEW = ["localhost", "127.0.0.1", ""].includes(location.hostname) && new URLSearchParams(location.search).get("live") !== "1";
@@ -88,8 +88,6 @@ function cacheElements() {
     "vehicleModel",
     "vehicleRegistration",
     "vehicleProject",
-    "vehicleContract",
-    "vehiclePic",
     "vehicleDriver",
     "vehicleReceived",
     "vehicleProjectDone",
@@ -831,7 +829,7 @@ function renderAdmin() {
 
   els.adminVehicleRows.innerHTML = state.vehicles.length
     ? state.vehicles.map(renderAdminVehicleRow).join("")
-    : `<tr><td colspan="7"><div class="empty-state">Belum ada rekod kenderaan.</div></td></tr>`;
+    : `<tr><td colspan="5"><div class="empty-state">Belum ada rekod kenderaan.</div></td></tr>`;
 
   els.adminUserRows.innerHTML = state.users.length
     ? state.users.map(renderAdminUserRow).join("")
@@ -846,8 +844,6 @@ function renderAdminVehicleRow(vehicle) {
         <div class="record-meta">Pemandu: ${escapeHtml(vehicle.driverName || "-")}</div>
       </td>
       <td>${escapeHtml(vehicle.projectName || "-")}</td>
-      <td>${escapeHtml(vehicle.contractNo || "-")}</td>
-      <td>${escapeHtml(vehicle.picName || "-")}</td>
       <td>${escapeHtml(vehicle.supervisorName || "-")}</td>
       <td>${escapeHtml(String(vehicle.capacity || "-"))}</td>
       <td>
@@ -1025,8 +1021,6 @@ async function handleVehicleSubmit(event) {
     model: els.vehicleModel.value.trim(),
     registrationNo: els.vehicleRegistration.value.trim().toUpperCase(),
     projectName: els.vehicleProject.value.trim(),
-    contractNo: els.vehicleContract.value.trim(),
-    picName: els.vehiclePic.value.trim(),
     driverName: els.vehicleDriver.value.trim(),
     receivedDate: els.vehicleReceived.value,
     projectReadyDate: els.vehicleProjectDone.value,
@@ -1092,8 +1086,6 @@ function fillVehicleForm(vehicle) {
   els.vehicleModel.value = vehicle.model || "";
   els.vehicleRegistration.value = vehicle.registrationNo || "";
   els.vehicleProject.value = vehicle.projectName || "";
-  els.vehicleContract.value = vehicle.contractNo || "";
-  els.vehiclePic.value = vehicle.picName || "";
   els.vehicleDriver.value = vehicle.driverName || "";
   els.vehicleReceived.value = vehicle.receivedDate || "";
   els.vehicleProjectDone.value = vehicle.projectReadyDate || "";

@@ -9,7 +9,7 @@
       name="description"
       content="Rekod live penggunaan kereta projek, jadual pemandu, dashboard penyelia, dan dashboard admin."
     >
-    <link rel="stylesheet" href="styles.css?v=ver1.3.0">
+    <link rel="stylesheet" href="styles.css?v=ver1.3.1">
   </head>
   <body>
     <div class="app-shell">
@@ -157,7 +157,7 @@
               <h2 id="adminTitle">Dashboard Admin</h2>
             </div>
             <p>
-              Admin mengurus kenderaan, projek, kontrak, PIC, penyelia, kapasiti,
+              Admin mengurus kenderaan, projek, penyelia, kapasiti,
               dan akses pengguna.
             </p>
           </div>
@@ -190,14 +190,6 @@
                 <label>
                   Nama Projek
                   <input type="text" id="vehicleProject" required>
-                </label>
-                <label>
-                  No Kontrak
-                  <input type="text" id="vehicleContract" required>
-                </label>
-                <label>
-                  Nama PIC
-                  <input type="text" id="vehiclePic" required>
                 </label>
                 <label>
                   Nama Pemandu
@@ -270,8 +262,6 @@
                     <tr>
                       <th>Kenderaan</th>
                       <th>Projek</th>
-                      <th>Kontrak</th>
-                      <th>PIC</th>
                       <th>Penyelia</th>
                       <th>Kapasiti</th>
                       <th>Tindakan</th>
@@ -326,10 +316,10 @@
         <button type="button" class="ghost-button" id="closePasswordDialog">Batal</button>
       </form>
     </dialog>
-    <div class="version-pill" aria-label="Versi aplikasi">Hafize | ver1.3.0</div>
+    <div class="version-pill" aria-label="Versi aplikasi">Hafize | ver1.3.1</div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="firebase-config.js?v=ver1.3.0"></script>
-    <script type="module" src="app.js?v=ver1.3.0"></script>
+    <script src="firebase-config.js?v=ver1.3.1"></script>
+    <script type="module" src="app.js?v=ver1.3.1"></script>
   </body>
 </html>
