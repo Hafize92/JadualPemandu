@@ -9,7 +9,7 @@
       name="description"
       content="Rekod live penggunaan kereta projek, jadual pemandu, dashboard penyelia, dan dashboard admin."
     >
-    <link rel="stylesheet" href="styles.css?v=ver1.4.1">
+    <link rel="stylesheet" href="styles.css?v=ver1.4.2">
   </head>
   <body>
     <div class="app-shell">
@@ -22,6 +22,7 @@
           </div>
         </div>
 
+        <button id="mobileAccountToggle" class="ghost-button mobile-only" type="button" aria-expanded="false" aria-controls="authPanel">Akaun</button>
         <div class="auth-card" id="authPanel" aria-live="polite"></div>
       </header>
 
@@ -149,6 +150,7 @@
                   <tbody id="supervisorRows"></tbody>
                 </table>
               </div>
+              <p id="mobileReportEmpty" class="mobile-only muted-text" hidden>Tiada penggunaan pada bulan ini.</p>
             </section>
           </div>
         </section>
@@ -320,10 +322,10 @@
         <button type="button" class="ghost-button" id="closePasswordDialog">Batal</button>
       </form>
     </dialog>
-    <div class="version-pill" aria-label="Versi aplikasi">Hafize | ver1.4.1</div>
+    <div class="version-pill" aria-label="Versi aplikasi">Hafize | ver1.4.2</div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="firebase-config.js?v=ver1.4.1"></script>
-    <script type="module" src="app.js?v=ver1.4.1"></script>
+    <script src="firebase-config.js?v=ver1.4.2"></script>
+    <script type="module" src="app.js?v=ver1.4.2"></script>
   </body>
 </html>

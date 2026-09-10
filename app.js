@@ -1,6 +1,6 @@
 import { buildAccessChanges } from "./access-policy.mjs";
 import { reportRows, downloadReport } from "./supervisor-report.mjs";
-const APP_VERSION = "ver1.4.1";
+const APP_VERSION = "ver1.4.2";
 const ROOT_ADMIN_UID = "Bg6iUrQS9cg4irQ3QAtG5VFDR8E2";
 const ROOT_ADMIN_EMAIL = "mhafize@jkr.gov.my";
 const DEVELOPMENT_PREVIEW = ["localhost", "127.0.0.1", ""].includes(location.hostname) && new URLSearchParams(location.search).get("live") !== "1";
@@ -147,6 +147,11 @@ function bindEvents() {
   });
 
   els.bookingForm.addEventListener("submit", handleBookingSubmit);
+  document.getElementById("mobileAccountToggle").addEventListener("click", event => {
+    const open = event.currentTarget.getAttribute("aria-expanded") !== "true";
+    event.currentTarget.setAttribute("aria-expanded", String(open));
+    document.querySelector(".topbar").classList.toggle("account-open", open);
+  });
   document.getElementById("reportMonth").value = toDateKey(new Date()).slice(0, 7);
   document.getElementById("reportMonth").addEventListener("change", renderSupervisor);
   document.getElementById("reportVehicle").addEventListener("change", renderSupervisor);
@@ -757,7 +762,8 @@ function renderSupervisor() {
   if (vehicles.some(v => v.id === selected)) select.value = selected;
   const month = document.getElementById("reportMonth").value;
   const rows = select.value ? reportRows(state.bookings, select.value, month) : [];
-  els.supervisorRows.innerHTML = rows.map(row => `<tr class="${row.weekend ? "report-weekend" : ""}">${row.values.map(value => `<td>${escapeHtml(String(value))}</td>`).join("")}<td>${row.booking ? `<div class="row-actions"><button class="ghost-button small" data-action="edit-booking" data-id="${escapeAttr(row.booking.id)}">Edit</button><button class="danger-button small" data-action="delete-booking" data-id="${escapeAttr(row.booking.id)}">Padam</button></div>` : ""}</td></tr>`).join("") || `<tr><td colspan="12">Pilih kenderaan dan bulan.</td></tr>`;
+  document.getElementById("mobileReportEmpty").hidden = rows.some(row => row.booking);
+  els.supervisorRows.innerHTML = rows.map(row => `<tr class="${row.weekend ? "report-weekend" : ""} ${row.booking ? "" : "report-blank"}">${row.values.map((value, i) => `<td data-label="${escapeAttr(["Bil.", "Tarikh", "Nama Pengguna", "Bertolak", "Balik", "Destinasi", "Tujuan", "Nama Pegawai", "Tandatangan", "Odometer", "Catatan"][i])}" data-empty="${String(value) === ""}">${escapeHtml(String(value))}</td>`).join("")}<td>${row.booking ? `<div class="row-actions"><button class="ghost-button small" data-action="edit-booking" data-id="${escapeAttr(row.booking.id)}">Edit</button><button class="danger-button small" data-action="delete-booking" data-id="${escapeAttr(row.booking.id)}">Padam</button></div>` : ""}</td></tr>`).join("") || `<tr><td colspan="12">Pilih kenderaan dan bulan.</td></tr>`;
 }
 
 function renderSupervisorVehicleItem(vehicle) {
@@ -839,6 +845,12 @@ function renderAdmin() {
   els.adminUserRows.innerHTML = state.users.length
     ? state.users.map(renderAdminUserRow).join("")
     : `<tr><td colspan="5"><div class="empty-state">Senarai akses akan dipaparkan selepas profil admin boleh membaca koleksi users.</div></td></tr>`;
+  for (const body of [els.adminVehicleRows, els.adminUserRows]) {
+    const table = body.closest("table");
+    table.classList.add("mobile-record-table");
+    const labels = [...table.querySelectorAll("th")].map(th => th.textContent);
+    for (const row of body.rows) [...row.cells].forEach((cell, i) => { if (cell.colSpan === 1) cell.dataset.label = labels[i]; });
+  }
 }
 
 function renderAdminVehicleRow(vehicle) {

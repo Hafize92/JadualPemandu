@@ -868,3 +868,49 @@ button, a { touch-action: manipulation; }
 .supervisor-report th:first-child { width: 54px; }
 .supervisor-report .report-weekend td { background: #ececec; }
 .supervisor-report td:nth-child(2) { white-space: pre-line; }
+
+.mobile-only { display: none; }
+@media (max-width: 600px) {
+  .mobile-only:not([hidden]) { display: block; }
+  .app-shell { width: calc(100% - 24px); }
+  .topbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding-bottom: 8px; }
+  .brand { gap: 8px; }
+  .brand-mark { width: 32px; height: 32px; font-size: 12px; }
+  .brand h1 { font-size: 18px; }
+  .brand p, .eyebrow { display: none; }
+  #authPanel { display: none; grid-column: 1 / -1; width: 100%; max-width: none; min-width: 0; }
+  .account-open #authPanel { display: block; padding: 8px 0; }
+  #authPanel .signed-in { grid-template-columns: 1fr; height: auto; }
+  #authPanel strong, #authPanel .muted-text { overflow-wrap: anywhere; }
+  #authPanel button { min-height: 44px; margin-block: 3px; }
+  h2 { font-size: 19px; }
+  .section-heading { margin: 16px 0 12px; }
+  .summary-grid { gap: 8px 0; padding: 10px 0; margin-bottom: 16px; }
+  .summary-card { min-height: 44px; }
+  .summary-card strong { font-size: 22px; margin-top: 3px; }
+  .calendar-grid { grid-auto-rows: 52px; }
+  .calendar-weekdays div { min-height: 28px; padding: 5px 0; }
+  .calendar-legend { gap: 6px 10px; }
+  .vehicle-item { padding: 12px; gap: 6px; }
+  .form-grid { padding: 12px 0; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+  input, select, textarea { min-width: 0; max-width: 100%; }
+  .small { min-height: 44px; }
+  .report-controls { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .report-controls label { min-width: 0; }
+  .supervisor-report, .mobile-record-table { display: block; min-width: 0; width: 100%; }
+  .supervisor-report thead, .mobile-record-table thead { display: none; }
+  .supervisor-report tbody, .mobile-record-table tbody { display: grid; gap: 12px; }
+  .supervisor-report tbody tr, .mobile-record-table tbody tr { display: block; min-width: 0; padding: 12px; background: white; border: 1px solid var(--line); border-radius: 8px; }
+  .supervisor-report tbody td, .mobile-record-table tbody td { display: block; width: 100%; padding: 5px 0; border: 0; text-align: left; font-size: 14px; background: transparent; overflow-wrap: anywhere; }
+  .supervisor-report td[data-label]::before, .mobile-record-table td[data-label]::before { content: attr(data-label); display: block; font-size: 11px; color: var(--muted); font-weight: 700; }
+  .supervisor-report tbody .report-blank,
+  .supervisor-report tbody td[data-empty="true"],
+  .supervisor-report tbody td:first-child,
+  .supervisor-report tbody td:nth-child(8),
+  .supervisor-report tbody td:nth-child(9) { display: none; }
+  .supervisor-report tbody td:nth-child(2) { font-weight: 700; color: var(--brand-dark); padding-top: 0; }
+  .supervisor-report td:nth-child(2)::before { display: none; }
+  .row-actions { margin-top: 6px; }
+  .row-actions button { flex: 1 1 auto; }
+  #mobileReportEmpty { padding: 12px 0; }
+}
