@@ -867,3 +867,4 @@ button, a { touch-action: manipulation; }
 .supervisor-report th { background: #dedede; }
 .supervisor-report th:first-child { width: 54px; }
 .supervisor-report .report-weekend td { background: #ececec; }
+.supervisor-report td:nth-child(2) { white-space: pre-line; }

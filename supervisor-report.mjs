@@ -24,9 +24,9 @@ export function reportRows(bookings, vehicleId, month) {
     const matches = bookings.filter(b => b.vehicleId === vehicleId && dayKey(b.startAt) <= key && dayKey(b.endAt) >= key && dayKey(b.startAt)).sort((a, b) => a.startAt.localeCompare(b.startAt));
     for (const b of matches.length ? matches : [null]) {
       rows.push({ booking: b, weekend, values: [weekend && !b ? "" : ++number,
-        new Intl.DateTimeFormat("ms-MY", { timeZone: zone, weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(date),
-        b?.userName || "", b && dayKey(b.startAt) === key ? time(b.startAt) : "", b && dayKey(b.endAt) === key ? time(b.endAt) : "",
-        b?.destination || "", b?.purpose || "", b?.officerName || "", "", b?.mileage ?? "", b?.notes || ""] });
+        new Intl.DateTimeFormat("ms-MY", { timeZone: zone, weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(date).replace(", ", ",\n"),
+        b?.userName || b?.officerName || "", b && dayKey(b.startAt) === key ? time(b.startAt) : "", b && dayKey(b.endAt) === key ? time(b.endAt) : "",
+        b?.destination || "", b?.purpose || "", b?.userName || b?.officerName || "", "", b?.mileage ?? "", b?.notes || ""] });
     }
   }
   return rows;

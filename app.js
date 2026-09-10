@@ -1,6 +1,6 @@
 import { buildAccessChanges } from "./access-policy.mjs";
 import { reportRows, downloadReport } from "./supervisor-report.mjs";
-const APP_VERSION = "ver1.4.0";
+const APP_VERSION = "ver1.4.1";
 const ROOT_ADMIN_UID = "Bg6iUrQS9cg4irQ3QAtG5VFDR8E2";
 const ROOT_ADMIN_EMAIL = "mhafize@jkr.gov.my";
 const DEVELOPMENT_PREVIEW = ["localhost", "127.0.0.1", ""].includes(location.hostname) && new URLSearchParams(location.search).get("live") !== "1";
@@ -74,7 +74,6 @@ function cacheElements() {
     "bookingForm",
     "bookingId",
     "bookingVehicle",
-    "bookingDriver",
     "bookingDestination",
     "bookingStart",
     "bookingEnd",
@@ -160,12 +159,6 @@ function bindEvents() {
     try { await downloadReport(vehicle, month, reportRows(state.bookings, vehicle.id, month)); }
     catch (error) { showToast(error.message); }
     finally { document.getElementById("downloadReport").disabled = false; }
-  });
-  els.bookingVehicle.addEventListener("change", () => {
-    const vehicle = findVehicle(els.bookingVehicle.value);
-    if (vehicle && !els.bookingId.value) {
-      els.bookingDriver.value = vehicle.driverName || "";
-    }
   });
   els.resetBookingForm.addEventListener("click", resetBookingForm);
   els.vehicleForm.addEventListener("submit", handleVehicleSubmit);
@@ -688,7 +681,7 @@ function renderVehicleItem(vehicle) {
         aria-pressed="${state.selectedVehicleId === vehicle.id}" aria-label="Lihat kalendar ${escapeAttr(vehicle.registrationNo || vehicle.model)}">
         ${escapeHtml(vehicle.registrationNo || "-")} (${escapeHtml(vehicle.model || "-")}) <span aria-hidden="true" class="vehicle-open-arrow">&rsaquo;</span>
       </button>
-      <span class="vehicle-meta">${escapeHtml([vehicle.projectDistrict, vehicle.projectState].filter(Boolean).join(", ") || "Lokasi belum ditetapkan")}</span>
+      <span class="vehicle-meta">${escapeHtml(vehicle.projectLocation ?? ([vehicle.projectDistrict, vehicle.projectState].filter(Boolean).join(", ") || "Lokasi belum ditetapkan")) || "Lokasi belum ditetapkan"}</span>
       <span class="record-meta">Penyelia: ${escapeHtml(vehicle.supervisorName || "-")}<br>No. telefon: ${phone
         ? `<a class="supervisor-whatsapp" href="https://wa.me/${phone}" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" aria-label="WhatsApp ${escapeAttr(vehicle.supervisorName || "penyelia")}">${escapeHtml(vehicle.supervisorPhone)}</a>`
         : escapeHtml(vehicle.supervisorPhone || "-")}</span>
@@ -908,10 +901,10 @@ async function handleBookingSubmit(event) {
   const payload = {
     vehicleId: vehicle.id,
     vehicleLabel: vehicleLabel(vehicle),
-    driverName: els.bookingDriver.value.trim(),
+    driverName: vehicle.driverName || "",
     userName: document.getElementById("bookingUser").value.trim(),
     purpose: document.getElementById("bookingPurpose").value.trim(),
-    officerName: document.getElementById("bookingOfficer").value.trim(),
+    officerName: document.getElementById("bookingUser").value.trim(),
     mileage: document.getElementById("bookingMileage").value,
     supervisorId: state.currentUser?.uid || vehicle.supervisorId || "",
     supervisorName: state.profile?.displayName || vehicle.supervisorName || "",
@@ -972,10 +965,8 @@ function handleBookingAction(event) {
   if (button.dataset.action === "edit-booking") {
     els.bookingId.value = booking.id;
     els.bookingVehicle.value = booking.vehicleId;
-    els.bookingDriver.value = booking.driverName || "";
-    document.getElementById("bookingUser").value = booking.userName || "";
+    document.getElementById("bookingUser").value = booking.userName || booking.officerName || "";
     document.getElementById("bookingPurpose").value = booking.purpose || "";
-    document.getElementById("bookingOfficer").value = booking.officerName || "";
     document.getElementById("bookingMileage").value = booking.mileage ?? "";
     els.bookingDestination.value = booking.destination || "";
     els.bookingStart.value = booking.startAt || "";
@@ -1025,7 +1016,6 @@ function resetBookingForm() {
   const vehicles = supervisorVehicles();
   if (vehicles[0]) {
     els.bookingVehicle.value = vehicles[0].id;
-    els.bookingDriver.value = vehicles[0].driverName || "";
   }
 }
 
@@ -1041,6 +1031,7 @@ async function handleVehicleSubmit(event) {
     model: els.vehicleModel.value.trim(),
     registrationNo: els.vehicleRegistration.value.trim().toUpperCase(),
     projectName: els.vehicleProject.value.trim(),
+    projectLocation: document.getElementById("vehicleLocation").value.trim(),
     driverName: els.vehicleDriver.value.trim(),
     receivedDate: els.vehicleReceived.value,
     projectReadyDate: els.vehicleProjectDone.value,
@@ -1106,6 +1097,7 @@ function fillVehicleForm(vehicle) {
   els.vehicleModel.value = vehicle.model || "";
   els.vehicleRegistration.value = vehicle.registrationNo || "";
   els.vehicleProject.value = vehicle.projectName || "";
+  document.getElementById("vehicleLocation").value = vehicle.projectLocation ?? [vehicle.projectDistrict, vehicle.projectState].filter(Boolean).join(", ");
   els.vehicleDriver.value = vehicle.driverName || "";
   els.vehicleReceived.value = vehicle.receivedDate || "";
   els.vehicleProjectDone.value = vehicle.projectReadyDate || "";
