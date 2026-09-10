@@ -4,20 +4,21 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#ffffff">
-    <title>Jadual Pemandu</title>
+    <title>NADI Pemandu</title>
+    <link rel="icon" type="image/png" href="jkr-logo.png">
     <meta
       name="description"
       content="Rekod live penggunaan kereta projek, jadual pemandu, dashboard penyelia, dan dashboard admin."
     >
-    <link rel="stylesheet" href="styles.css?v=ver1.4.2">
+    <link rel="stylesheet" href="styles.css?v=ver1.5.0">
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
         <div class="brand">
-          <span class="brand-mark" aria-hidden="true">JP</span>
+          <img class="brand-mark" src="jkr-logo.png" alt="Logo Jabatan Kerja Raya" width="120" height="91">
           <div>
-            <h1>Jadual Pemandu</h1>
+            <h1>NADI Pemandu</h1>
             <p>Rekod penggunaan kereta projek jabatan</p>
           </div>
         </div>
@@ -322,10 +323,10 @@
         <button type="button" class="ghost-button" id="closePasswordDialog">Batal</button>
       </form>
     </dialog>
-    <div class="version-pill" aria-label="Versi aplikasi">Hafize | ver1.4.2</div>
+    <div class="version-pill" aria-label="Versi aplikasi">Hafize | ver1.5.0</div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="firebase-config.js?v=ver1.4.2"></script>
-    <script type="module" src="app.js?v=ver1.4.2"></script>
+    <script src="firebase-config.js?v=ver1.5.0"></script>
+    <script type="module" src="app.js?v=ver1.5.0"></script>
   </body>
 </html>

@@ -3,11 +3,11 @@
   --bg: #f7f8f6;
   --surface: #ffffff;
   --surface-2: #f0f5f2;
-  --ink: #17231d;
-  --muted: #66736c;
-  --line: #dce5df;
-  --brand: #116a5c;
-  --brand-dark: #0b4a42;
+  --ink: #242424;
+  --muted: #666666;
+  --line: #dddddd;
+  --brand: #f5ce19;
+  --brand-dark: #242424;
   --accent: #b44a2f;
   --accent-soft: #f6e4de;
   --gold: #bf8b24;
@@ -869,13 +869,23 @@ button, a { touch-action: manipulation; }
 .supervisor-report .report-weekend td { background: #ececec; }
 .supervisor-report td:nth-child(2) { white-space: pre-line; }
 
+/* JKR identity: yellow, black and grey; operational status colours stay distinct. */
+.brand-mark { width: 68px; height: 52px; object-fit: contain; border-radius: 0; background: transparent; }
+.topbar { border-bottom: 3px solid var(--brand); }
+.primary-button { color: #171717; border-color: #c1a000; }
+.primary-button:hover { background: #e7bf08; }
+.tab.is-active { color: #242424; font-weight: 700; border-color: var(--brand); }
+.role-chip { background: #eeeeee; color: #242424; }
+.calendar-day.is-today .calendar-date { color: #171717; }
+.calendar-day.is-today { box-shadow: inset 0 0 0 2px #a88b00; }
+input:focus, select:focus, textarea:focus, button:focus-visible { outline: 3px solid #a88b00; }
 .mobile-only { display: none; }
 @media (max-width: 600px) {
   .mobile-only:not([hidden]) { display: block; }
   .app-shell { width: calc(100% - 24px); }
   .topbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; padding-bottom: 8px; }
   .brand { gap: 8px; }
-  .brand-mark { width: 32px; height: 32px; font-size: 12px; }
+  .brand-mark { width: 46px; height: 35px; }
   .brand h1 { font-size: 18px; }
   .brand p, .eyebrow { display: none; }
   #authPanel { display: none; grid-column: 1 / -1; width: 100%; max-width: none; min-width: 0; }
