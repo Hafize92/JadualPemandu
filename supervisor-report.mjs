@@ -31,6 +31,16 @@ export function reportRows(bookings, vehicleId, month) {
   }
   return rows;
 }
+export function driverMessage(vehicle, booking) {
+  const start = dayKey(booking.startAt);
+  const end = dayKey(booking.endAt);
+  const date = key => key ? key.split("-").reverse().map(Number).join("/") : "-";
+  return [vehicle.registrationNo || "-", booking.destination || "-",
+    start === end ? date(start) : `${date(start)} hingga ${date(end)}`,
+    `${time(booking.startAt)} Bertolak - ${time(booking.endAt)} Balik`,
+    booking.userName || booking.officerName || "-", booking.purpose || "-", "",
+    "Sila nyatakan bacaan odometer sebelum dan selepas penggunaan ini."].join("\n");
+}
 let excelReady;
 export async function downloadReport(vehicle, month, rows) {
   if (!excelReady) excelReady = new Promise((resolve, reject) => {

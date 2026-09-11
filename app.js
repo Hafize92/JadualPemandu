@@ -1,6 +1,6 @@
 import { buildAccessChanges } from "./access-policy.mjs";
-import { reportRows, downloadReport } from "./supervisor-report.mjs";
-const APP_VERSION = "ver1.5.1";
+import { reportRows, downloadReport, driverMessage } from "./supervisor-report.mjs";
+const APP_VERSION = "ver1.5.2";
 const ROOT_ADMIN_UID = "Bg6iUrQS9cg4irQ3QAtG5VFDR8E2";
 const ROOT_ADMIN_EMAIL = "mhafize@jkr.gov.my";
 const DEVELOPMENT_PREVIEW = ["localhost", "127.0.0.1", ""].includes(location.hostname) && new URLSearchParams(location.search).get("live") !== "1";
@@ -764,6 +764,16 @@ function renderSupervisor() {
   const rows = select.value ? reportRows(state.bookings, select.value, month) : [];
   document.getElementById("mobileReportEmpty").hidden = rows.some(row => row.booking);
   els.supervisorRows.innerHTML = rows.map(row => `<tr class="${row.weekend ? "report-weekend" : ""} ${row.booking ? "" : "report-blank"}">${row.values.map((value, i) => `<td data-label="${escapeAttr(["Bil.", "Tarikh", "Nama Pengguna", "Bertolak", "Balik", "Destinasi", "Tujuan", "Nama Pegawai", "Tandatangan", "Odometer", "Catatan"][i])}" data-empty="${String(value) === ""}">${escapeHtml(String(value))}</td>`).join("")}<td>${row.booking ? `<div class="row-actions"><button class="ghost-button small" data-action="edit-booking" data-id="${escapeAttr(row.booking.id)}">Edit</button><button class="danger-button small" data-action="delete-booking" data-id="${escapeAttr(row.booking.id)}">Padam</button></div>` : ""}</td></tr>`).join("") || `<tr><td colspan="12">Pilih kenderaan dan bulan.</td></tr>`;
+  for (const edit of els.supervisorRows.querySelectorAll('[data-action="edit-booking"]')) {
+    const notify = document.createElement("button");
+    notify.type = "button";
+    notify.className = "ghost-button small";
+    notify.dataset.action = "notify-driver";
+    notify.dataset.id = edit.dataset.id;
+    notify.textContent = "WhatsApp Pemandu";
+    notify.title = "Buka mesej penggunaan untuk dihantar kepada pemandu";
+    edit.parentElement.append(notify);
+  }
 }
 
 function renderSupervisorVehicleItem(vehicle) {
@@ -987,6 +997,13 @@ function handleBookingAction(event) {
     els.bookingForm.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  if (button.dataset.action === "notify-driver") {
+    const vehicle = findVehicle(booking.vehicleId);
+    const phone = whatsappNumber(vehicle?.driverPhone);
+    if (!phone) { showToast("Admin perlu mengisi nombor telefon pemandu yang sah pada rekod kenderaan."); return; }
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(driverMessage(vehicle, booking))}`, "_blank", "noopener,noreferrer");
+  }
+
   if (button.dataset.action === "delete-booking") {
     deleteBooking(booking.id);
   }
@@ -1033,6 +1050,12 @@ function resetBookingForm() {
 
 async function handleVehicleSubmit(event) {
   event.preventDefault();
+  const phoneInput = document.getElementById("vehicleDriverPhone");
+  if (phoneInput.value.trim() && !whatsappNumber(phoneInput.value)) {
+    showToast("Masukkan nombor telefon bimbit Malaysia yang sah, contoh 0123456789.");
+    phoneInput.focus();
+    return;
+  }
   if (!isAdmin()) {
     showToast("Akses admin diperlukan.");
     return;
@@ -1045,6 +1068,7 @@ async function handleVehicleSubmit(event) {
     projectName: els.vehicleProject.value.trim(),
     projectLocation: document.getElementById("vehicleLocation").value.trim(),
     driverName: els.vehicleDriver.value.trim(),
+    driverPhone: document.getElementById("vehicleDriverPhone").value.trim(),
     receivedDate: els.vehicleReceived.value,
     projectReadyDate: els.vehicleProjectDone.value,
     supervisorName: els.vehicleSupervisorName.value.trim(),
@@ -1111,6 +1135,7 @@ function fillVehicleForm(vehicle) {
   els.vehicleProject.value = vehicle.projectName || "";
   document.getElementById("vehicleLocation").value = vehicle.projectLocation ?? [vehicle.projectDistrict, vehicle.projectState].filter(Boolean).join(", ");
   els.vehicleDriver.value = vehicle.driverName || "";
+  document.getElementById("vehicleDriverPhone").value = vehicle.driverPhone || "";
   els.vehicleReceived.value = vehicle.receivedDate || "";
   els.vehicleProjectDone.value = vehicle.projectReadyDate || "";
   els.vehicleSupervisorName.value = vehicle.supervisorName || "";

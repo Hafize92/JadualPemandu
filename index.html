@@ -10,7 +10,7 @@
       name="description"
       content="Rekod live penggunaan kereta projek, jadual pemandu, dashboard penyelia, dan dashboard admin."
     >
-    <link rel="stylesheet" href="styles.css?v=ver1.5.1">
+    <link rel="stylesheet" href="styles.css?v=ver1.5.2">
   </head>
   <body>
     <div class="app-shell">
@@ -202,6 +202,7 @@
                   Nama Pemandu
                   <input type="text" id="vehicleDriver" required>
                 </label>
+                <label>No. Telefon Pemandu<input type="tel" id="vehicleDriverPhone" autocomplete="tel" placeholder="0123456789"></label>
                 <label>
                   Tarikh Terima Kereta
                   <input type="date" id="vehicleReceived" required>
@@ -323,10 +324,10 @@
         <button type="button" class="ghost-button" id="closePasswordDialog">Batal</button>
       </form>
     </dialog>
-    <div class="version-pill" aria-label="Versi aplikasi">Hafize | ver1.5.1</div>
+    <div class="version-pill" aria-label="Versi aplikasi">Hafize | ver1.5.2</div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="firebase-config.js?v=ver1.5.1"></script>
-    <script type="module" src="app.js?v=ver1.5.1"></script>
+    <script src="firebase-config.js?v=ver1.5.2"></script>
+    <script type="module" src="app.js?v=ver1.5.2"></script>
   </body>
 </html>
