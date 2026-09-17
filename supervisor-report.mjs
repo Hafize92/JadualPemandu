@@ -31,6 +31,15 @@ export function reportRows(bookings, vehicleId, month) {
   }
   return rows;
 }
+export function usageRows(bookings, vehicleId, month) {
+  return reportRows(bookings, vehicleId, month).filter(row => row.booking)
+    .map((row, index) => ({ ...row, values: [index + 1, ...row.values.slice(1)] }));
+}
+export function driverWhatsAppUrl(phone, message, mobile = false) {
+  if (!/^601\d{8,9}$/.test(phone)) throw new Error("Invalid driver phone");
+  return mobile ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+    : `https://web.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`;
+}
 export function driverMessage(vehicle, booking) {
   const start = dayKey(booking.startAt);
   const end = dayKey(booking.endAt);
@@ -38,10 +47,10 @@ export function driverMessage(vehicle, booking) {
   const dated = key => `${date(key)} ${key ? new Intl.DateTimeFormat("ms-MY", { weekday: "long", timeZone: zone }).format(new Date(`${key}T12:00:00+08:00`)) : ""}`.trim();
   const clock = value => time(value).replace(".", ":").replace(" ", "");
   return [`1. *(${dated(start)}${start !== end ? ` hingga ${dated(end)}` : ""})*`, "",
-    `\u23f0\ufe0fjam pergi = ${clock(booking.startAt)}`,
-    `\u23f0\ufe0fjam pulang = ${clock(booking.endAt)}${start !== end ? ` (${date(end)})` : ""}`, "",
-    `\ud83d\udccc${booking.destination || "-"}`, "",
-    `\ud83d\udc64${booking.userName || booking.officerName || "-"} (${booking.purpose || "-"})`, "",
+    `    \u23f0 jam pergi = ${clock(booking.startAt)}`,
+    `    \u23f0 jam pulang = ${clock(booking.endAt)}${start !== end ? ` (${date(end)})` : ""}`, "",
+    `    \ud83d\udccc ${booking.destination || "-"}`, "",
+    `    \ud83d\udc64 ${booking.userName || booking.officerName || "-"} (${booking.purpose || "-"})`, "",
     "Sila nyatakan bacaan odometer sebelum dan selepas penggunaan ini."].join("\n");
 }
 let excelReady;

@@ -1,10 +1,28 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { reportRows, driverMessage } from "../supervisor-report.mjs";
+import { reportRows, usageRows, driverMessage, driverWhatsAppUrl } from "../supervisor-report.mjs";
 test("driver message follows requested order and includes odometer request", () => {
   const message = driverMessage({ registrationNo: "JXE 5238" }, { startAt: "2026-09-11T09:00", endAt: "2026-09-11T17:00", destination: "Melaka", userName: "Hafize", purpose: "Mesyuarat" });
-  assert.equal(message, "1. *(11/9/2026 Jumaat)*\n\n\u23f0\ufe0fjam pergi = 9:00Pagi\n\u23f0\ufe0fjam pulang = 5:00Petang\n\n\ud83d\udcccMelaka\n\n\ud83d\udc64Hafize (Mesyuarat)\n\nSila nyatakan bacaan odometer sebelum dan selepas penggunaan ini.");
+  assert.equal(message, "1. *(11/9/2026 Jumaat)*\n\n    \u23f0 jam pergi = 9:00Pagi\n    \u23f0 jam pulang = 5:00Petang\n\n    \ud83d\udccc Melaka\n\n    \ud83d\udc64 Hafize (Mesyuarat)\n\nSila nyatakan bacaan odometer sebelum dan selepas penggunaan ini.");
   assert.match(driverMessage({}, { startAt: "2026-09-11T09:00", endAt: "2026-09-12T17:00" }), /jam pulang = 5:00Petang \(12\/9\/2026\)/);
+});
+test("WhatsApp routes retain emoji and indentation without a desktop redirect", () => {
+  const message = driverMessage({}, { startAt: "2026-09-24T11:06", endAt: "2026-09-25T11:06", destination: "A & B" });
+  for (const mobile of [true, false]) {
+    const url = new URL(driverWhatsAppUrl("60123456789", message, mobile));
+    assert.equal(url.hostname, mobile ? "wa.me" : "web.whatsapp.com");
+    assert.equal(url.searchParams.get("text"), message);
+    assert.ok(url.searchParams.get("text").includes("    \ud83d\udccc A & B"));
+  }
+  assert.throws(() => driverWhatsAppUrl("javascript:bad", message));
+});
+test("screen hides unused days while Excel keeps the full month and older records", () => {
+  const bookings = [{ vehicleId: "a", startAt: "2024-09-24T11:06", endAt: "2024-09-25T11:06" }];
+  const screen = usageRows(bookings, "a", "2024-09");
+  assert.equal(screen.length, 2);
+  assert.deepEqual(screen.map(row => row.values[0]), [1, 2]);
+  assert.equal(reportRows(bookings, "a", "2024-09").length, 30);
+  assert.deepEqual(usageRows([], "a", "2026-09"), []);
 });
 test("monthly template includes blank days, separate user and blank signature", () => {
   const message = driverMessage({}, { startAt: "2026-09-24T11:06", endAt: "2026-09-25T11:06" });

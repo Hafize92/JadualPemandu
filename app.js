@@ -1,6 +1,6 @@
 import { buildAccessChanges } from "./access-policy.mjs";
-import { reportRows, downloadReport, driverMessage } from "./supervisor-report.mjs";
-const APP_VERSION = "ver1.5.8";
+import { reportRows, usageRows, downloadReport, driverMessage, driverWhatsAppUrl } from "./supervisor-report.mjs";
+const APP_VERSION = "ver1.5.9";
 const ROOT_ADMIN_UID = "Bg6iUrQS9cg4irQ3QAtG5VFDR8E2";
 const ROOT_ADMIN_EMAIL = "mhafize@jkr.gov.my";
 const DEVELOPMENT_PREVIEW = ["localhost", "127.0.0.1", ""].includes(location.hostname) && new URLSearchParams(location.search).get("live") !== "1";
@@ -789,9 +789,12 @@ function renderSupervisor() {
   select.innerHTML = vehicles.map(v => `<option value="${escapeAttr(v.id)}">${escapeHtml(vehicleLabel(v))}</option>`).join("");
   if (vehicles.some(v => v.id === selected)) select.value = selected;
   const month = document.getElementById("reportMonth").value;
-  const rows = select.value ? reportRows(state.bookings, select.value, month) : [];
+  const rows = select.value ? usageRows(state.bookings, select.value, month) : [];
   document.getElementById("mobileReportEmpty").hidden = rows.some(row => row.booking);
   els.supervisorRows.innerHTML = rows.map(row => `<tr class="${row.weekend ? "report-weekend" : ""} ${row.booking ? "" : "report-blank"}">${row.values.map((value, i) => `<td data-label="${escapeAttr(["Bil.", "Tarikh", "Nama Pengguna", "Bertolak", "Balik", "Destinasi", "Tujuan", "Nama Pegawai", "Tandatangan", "Odometer", "Catatan"][i])}" data-empty="${String(value) === ""}">${escapeHtml(String(value))}</td>`).join("")}<td>${row.booking ? `<div class="row-actions"><button class="ghost-button small" data-action="edit-booking" data-id="${escapeAttr(row.booking.id)}">Edit</button><button class="danger-button small" data-action="delete-booking" data-id="${escapeAttr(row.booking.id)}">Padam</button></div>` : ""}</td></tr>`).join("") || `<tr><td colspan="12">Pilih kenderaan dan bulan.</td></tr>`;
+  if (select.value && !rows.length) {
+    els.supervisorRows.innerHTML = '<tr><td colspan="12">Tiada penggunaan pada bulan ini.</td></tr>';
+  }
   for (const edit of els.supervisorRows.querySelectorAll('[data-action="edit-booking"]')) {
     const notify = document.createElement("button");
     notify.type = "button";
@@ -801,13 +804,6 @@ function renderSupervisor() {
     notify.textContent = "WhatsApp Pemandu";
     notify.title = "Buka mesej penggunaan untuk dihantar kepada pemandu";
     edit.parentElement.append(notify);
-    const copy = document.createElement("button");
-    copy.type = "button";
-    copy.className = "ghost-button small";
-    copy.dataset.action = "copy-driver-message";
-    copy.dataset.id = edit.dataset.id;
-    copy.textContent = "Salin Mesej";
-    edit.parentElement.append(copy);
   }
 }
 
@@ -1033,16 +1029,12 @@ function handleBookingAction(event) {
     els.bookingForm.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  if (button.dataset.action === "copy-driver-message") {
-    navigator.clipboard.writeText(driverMessage(findVehicle(booking.vehicleId) || {}, booking))
-      .then(() => showToast("Mesej disalin. Tampal dalam WhatsApp untuk mengekalkan emoji."))
-      .catch(() => showToast("Tidak dapat menyalin mesej. Sila benarkan akses papan klip."));
-  }
   if (button.dataset.action === "notify-driver") {
     const vehicle = findVehicle(booking.vehicleId);
     const phone = whatsappNumber(vehicle?.driverPhone);
     if (!phone) { showToast("Admin perlu mengisi nombor telefon pemandu yang sah pada rekod kenderaan."); return; }
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(driverMessage(vehicle, booking))}`, "_blank", "noopener,noreferrer");
+    const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    window.open(driverWhatsAppUrl(phone, driverMessage(vehicle, booking), mobile), "_blank", "noopener,noreferrer");
   }
 
   if (button.dataset.action === "delete-booking") {

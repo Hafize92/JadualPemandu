@@ -32,5 +32,11 @@ existing supervisors can edit bookings.
 Spark quotas apply; this deployment never attaches a billing account.
 
 Local preview: node preview-server.cjs then http://127.0.0.1:5187.
+
+Record retention: bookings have no automatic expiry or client-side age cutoff.
+Historical months, including records two years old, remain available in the
+supervisor report and full-month Excel export. Manual deletion still permanently
+removes a booking; this is not an immutable archive or automatic two-year purge.
+No paid scheduler or Firestore TTL is enabled by this application.
 Use ?live=1 for real Firebase login. Preview writes are in-memory only.
 Tests: node tests/access-policy.test.mjs.
