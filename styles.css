@@ -763,6 +763,9 @@ dialog p { margin: 16px 0; }
 .vehicle-calendar-trigger { border: 0; background: transparent; padding: 0; text-align: left; color: inherit; }
 .vehicle-calendar-trigger::after { content: ""; position: absolute; inset: 0; cursor: pointer; border-radius: 8px; }
 .vehicle-calendar-trigger:focus-visible::after { outline: 2px solid var(--brand); }
+.vehicle-calendar-trigger:disabled { opacity: 1; cursor: not-allowed; }
+.vehicle-calendar-trigger:disabled::after { cursor: not-allowed; }
+.vehicle-calendar-button:has(.vehicle-calendar-trigger:disabled):hover { border-color: var(--line); }
 .supervisor-whatsapp { position: relative; z-index: 1; display: inline-flex; align-items: center; min-height: 44px; color: var(--brand-dark); text-decoration: underline; text-underline-offset: 3px; }
 .vehicle-calendar-button:has(.vehicle-calendar-trigger[aria-pressed="true"]) { outline: 2px solid var(--vehicle-color); outline-offset: 1px; }
 .vehicle-calendar-button:hover { border-color: var(--vehicle-color); }

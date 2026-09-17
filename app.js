@@ -1,6 +1,6 @@
 import { buildAccessChanges } from "./access-policy.mjs";
 import { reportRows, downloadReport, driverMessage } from "./supervisor-report.mjs";
-const APP_VERSION = "ver1.5.3";
+const APP_VERSION = "ver1.5.4";
 const ROOT_ADMIN_UID = "Bg6iUrQS9cg4irQ3QAtG5VFDR8E2";
 const ROOT_ADMIN_EMAIL = "mhafize@jkr.gov.my";
 const DEVELOPMENT_PREVIEW = ["localhost", "127.0.0.1", ""].includes(location.hostname) && new URLSearchParams(location.search).get("live") !== "1";
@@ -114,6 +114,7 @@ function bindEvents() {
   els.vehicleStatusList.addEventListener("click", (event) => {
     const vehicle = event.target.closest("[data-calendar-vehicle]");
     if (!vehicle) return;
+    if (findVehicle(vehicle.dataset.calendarVehicle)?.restrictedUse === true) return;
     state.selectedVehicleId = vehicle.dataset.calendarVehicle;
     renderCalendar();
     document.getElementById("scheduleTableTitle").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -565,7 +566,7 @@ function setDemoRole(role) {
 }
 
 function renderCalendar() {
-  if (state.selectedVehicleId && !findVehicle(state.selectedVehicleId)) state.selectedVehicleId = "";
+  if (state.selectedVehicleId && (!findVehicle(state.selectedVehicleId) || findVehicle(state.selectedVehicleId).restrictedUse === true)) state.selectedVehicleId = "";
   const selectedVehicle = findVehicle(state.selectedVehicleId);
   document.getElementById("scheduleTableTitle").textContent = selectedVehicle
     ? `${selectedVehicle.registrationNo} (${selectedVehicle.model})` : "Jadual";
@@ -700,8 +701,9 @@ function renderVehicleItem(vehicle) {
   return `
     <article class="vehicle-item vehicle-calendar-button" style="--vehicle-color: ${color}">
       <button type="button" class="vehicle-title vehicle-calendar-trigger" data-calendar-vehicle="${escapeAttr(vehicle.id)}"
+        ${vehicle.restrictedUse === true ? 'disabled title="Penggunaan Terhad: kenderaan tidak boleh dipilih"' : ""}
         aria-pressed="${state.selectedVehicleId === vehicle.id}" aria-label="Lihat kalendar ${escapeAttr(vehicle.registrationNo || vehicle.model)}">
-        ${escapeHtml(vehicle.registrationNo || "-")} (${escapeHtml(vehicle.model || "-")}) <span aria-hidden="true" class="vehicle-open-arrow">&rsaquo;</span>
+        ${escapeHtml(vehicle.registrationNo || "-")} (${escapeHtml(vehicle.model || "-")}) ${vehicle.restrictedUse === true ? "" : '<span aria-hidden="true" class="vehicle-open-arrow">&rsaquo;</span>'}
       </button>
       <span class="vehicle-meta">${escapeHtml(vehicle.projectLocation ?? ([vehicle.projectDistrict, vehicle.projectState].filter(Boolean).join(", ") || "Lokasi belum ditetapkan")) || "Lokasi belum ditetapkan"}</span>
       <span class="record-meta">Penyelia: ${escapeHtml(vehicle.supervisorName || "-")}<br>No. telefon: ${phone
