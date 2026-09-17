@@ -35,11 +35,11 @@ export function driverMessage(vehicle, booking) {
   const start = dayKey(booking.startAt);
   const end = dayKey(booking.endAt);
   const date = key => key ? key.split("-").reverse().map(Number).join("/") : "-";
-  const weekday = start ? new Intl.DateTimeFormat("ms-MY", { weekday: "short", timeZone: zone }).format(new Date(`${start}T12:00:00+08:00`)).toUpperCase() : "-";
+  const dated = key => `${date(key)} ${key ? new Intl.DateTimeFormat("ms-MY", { weekday: "long", timeZone: zone }).format(new Date(`${key}T12:00:00+08:00`)) : ""}`.trim();
   const clock = value => time(value).replace(".", ":").replace(" ", "");
-  return [`1. *(${date(start)} ${weekday})*`, "",
-    `\u23f0jam pergi = ${clock(booking.startAt)}`,
-    `\u23f0jam pulang = ${clock(booking.endAt)}${start !== end ? ` (${date(end)})` : ""}`, "",
+  return [`1. *(${dated(start)}${start !== end ? ` hingga ${dated(end)}` : ""})*`, "",
+    `\u23f0\ufe0fjam pergi = ${clock(booking.startAt)}`,
+    `\u23f0\ufe0fjam pulang = ${clock(booking.endAt)}${start !== end ? ` (${date(end)})` : ""}`, "",
     `\ud83d\udccc${booking.destination || "-"}`, "",
     `\ud83d\udc64${booking.userName || booking.officerName || "-"} (${booking.purpose || "-"})`, "",
     "Sila nyatakan bacaan odometer sebelum dan selepas penggunaan ini."].join("\n");

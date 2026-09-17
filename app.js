@@ -1,6 +1,6 @@
 import { buildAccessChanges } from "./access-policy.mjs";
 import { reportRows, downloadReport, driverMessage } from "./supervisor-report.mjs";
-const APP_VERSION = "ver1.5.7";
+const APP_VERSION = "ver1.5.8";
 const ROOT_ADMIN_UID = "Bg6iUrQS9cg4irQ3QAtG5VFDR8E2";
 const ROOT_ADMIN_EMAIL = "mhafize@jkr.gov.my";
 const DEVELOPMENT_PREVIEW = ["localhost", "127.0.0.1", ""].includes(location.hostname) && new URLSearchParams(location.search).get("live") !== "1";
@@ -801,6 +801,13 @@ function renderSupervisor() {
     notify.textContent = "WhatsApp Pemandu";
     notify.title = "Buka mesej penggunaan untuk dihantar kepada pemandu";
     edit.parentElement.append(notify);
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "ghost-button small";
+    copy.dataset.action = "copy-driver-message";
+    copy.dataset.id = edit.dataset.id;
+    copy.textContent = "Salin Mesej";
+    edit.parentElement.append(copy);
   }
 }
 
@@ -1026,6 +1033,11 @@ function handleBookingAction(event) {
     els.bookingForm.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  if (button.dataset.action === "copy-driver-message") {
+    navigator.clipboard.writeText(driverMessage(findVehicle(booking.vehicleId) || {}, booking))
+      .then(() => showToast("Mesej disalin. Tampal dalam WhatsApp untuk mengekalkan emoji."))
+      .catch(() => showToast("Tidak dapat menyalin mesej. Sila benarkan akses papan klip."));
+  }
   if (button.dataset.action === "notify-driver") {
     const vehicle = findVehicle(booking.vehicleId);
     const phone = whatsappNumber(vehicle?.driverPhone);
