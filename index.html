@@ -10,10 +10,19 @@
       name="description"
       content="Rekod live penggunaan kereta projek, jadual pemandu, dashboard penyelia, dan dashboard admin."
     >
-    <link rel="stylesheet" href="styles.css?v=ver1.5.5">
+    <link rel="stylesheet" href="styles.css?v=ver1.5.6">
   </head>
-  <body>
-    <div class="app-shell">
+  <body class="notice-pending">
+    <dialog id="usageNotice" aria-labelledby="usageNoticeTitle" aria-describedby="usageNoticeText">
+      <h2 id="usageNoticeTitle">Makluman Penggunaan Kenderaan</h2>
+      <div id="usageNoticeText">
+        <p>Penggunaan kereta yang dipilih boleh dibatalkan / ditukarkan ke kereta yang lain (jika berkaitan).</p>
+        <p>Perjalanan adalah dihadkan di kawasan Lembah Kelang sahaja dan urusan rasmi projek kenderaan tersebut.</p>
+        <p>Kenderaan berstatus "Penggunaan Terhad" adalah tidak dibenarkan untuk dibuat tempahan.</p>
+      </div>
+      <button id="acceptUsageNotice" class="primary-button" type="button" autofocus>Saya Faham</button>
+    </dialog>
+    <div class="app-shell" inert>
       <header class="topbar">
         <div class="brand">
           <img class="brand-mark" src="jkr-logo.png" alt="Logo Jabatan Kerja Raya" width="120" height="91">
@@ -324,10 +333,10 @@
         <button type="button" class="ghost-button" id="closePasswordDialog">Batal</button>
       </form>
     </dialog>
-    <div class="version-pill" aria-label="Versi aplikasi">Hafize | ver1.5.5</div>
+    <div class="version-pill" aria-label="Versi aplikasi">Hafize | ver1.5.6</div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="firebase-config.js?v=ver1.5.5"></script>
-    <script type="module" src="app.js?v=ver1.5.5"></script>
+    <script src="firebase-config.js?v=ver1.5.6"></script>
+    <script type="module" src="app.js?v=ver1.5.6"></script>
   </body>
 </html>
