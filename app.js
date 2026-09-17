@@ -1,6 +1,6 @@
 import { buildAccessChanges } from "./access-policy.mjs";
 import { reportRows, downloadReport, driverMessage } from "./supervisor-report.mjs";
-const APP_VERSION = "ver1.5.2";
+const APP_VERSION = "ver1.5.3";
 const ROOT_ADMIN_UID = "Bg6iUrQS9cg4irQ3QAtG5VFDR8E2";
 const ROOT_ADMIN_EMAIL = "mhafize@jkr.gov.my";
 const DEVELOPMENT_PREVIEW = ["localhost", "127.0.0.1", ""].includes(location.hostname) && new URLSearchParams(location.search).get("live") !== "1";
@@ -147,6 +147,23 @@ function bindEvents() {
   });
 
   els.bookingForm.addEventListener("submit", handleBookingSubmit);
+  els.supervisorVehicleList.addEventListener("change", async event => {
+    const input = event.target.closest("[data-restricted-vehicle]");
+    if (!input) return;
+    const vehicle = supervisorVehicles().find(v => v.id === input.dataset.restrictedVehicle);
+    if (!vehicle || !(isAdmin() || isSupervisor())) { renderAll(); return; }
+    const restrictedUse = input.checked;
+    input.disabled = true;
+    try {
+      if (state.firebaseReady) {
+        await state.sdk.updateDoc(state.sdk.doc(state.db, "vehicles", vehicle.id), { restrictedUse });
+      } else if (DEVELOPMENT_PREVIEW) {
+        vehicle.restrictedUse = restrictedUse;
+      } else throw new Error("Sambungan Firebase diperlukan.");
+      showToast(restrictedUse ? "Penggunaan Terhad diaktifkan." : "Penggunaan Terhad dinyahaktifkan.");
+    } catch (error) { showToast(readableFirebaseError(error)); }
+    finally { renderAll(); }
+  });
   document.getElementById("mobileAccountToggle").addEventListener("click", event => {
     const open = event.currentTarget.getAttribute("aria-expanded") !== "true";
     event.currentTarget.setAttribute("aria-expanded", String(open));
@@ -790,6 +807,7 @@ function renderSupervisorVehicleItem(vehicle) {
         Terima: ${formatDate(vehicle.receivedDate)}<br>
         Siap projek: ${formatDate(vehicle.projectReadyDate)}
       </div>
+      <label class="checkbox-label"><input type="checkbox" data-restricted-vehicle="${escapeAttr(vehicle.id)}" ${vehicle.restrictedUse === true ? "checked" : ""}>Penggunaan Terhad</label>
     </article>
   `;
 }
@@ -1299,6 +1317,9 @@ async function handleRegistration(event) {
 }
 
 function vehicleAvailability(vehicleId) {
+  if (findVehicle(vehicleId)?.restrictedUse === true) {
+    return { key: "restricted", label: "Penggunaan Terhad", detail: "Sila hubungi penyelia untuk urusan penggunaan." };
+  }
   const now = new Date();
   const vehicleBookings = state.bookings
     .filter((booking) => booking.vehicleId === vehicleId)

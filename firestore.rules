@@ -35,6 +35,9 @@ service cloud.firestore {
     match /vehicles/{vehicleId} {
       allow read: if true;
       allow create, update, delete: if isAdmin();
+      allow update: if isSupervisor() && assignedByList(vehicleId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['restrictedUse'])
+        && request.resource.data.restrictedUse is bool;
     }
 
     match /bookings/{bookingId} {

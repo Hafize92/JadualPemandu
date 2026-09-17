@@ -401,6 +401,8 @@ button:focus-visible {
   color: var(--ok);
 }
 
+.status-chip.restricted { background: #fff1ce; color: #765000; white-space: normal; text-align: center; }
+
 .status-chip.active {
   background: var(--accent-soft);
   color: var(--accent);
