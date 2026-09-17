@@ -1,6 +1,6 @@
 import { buildAccessChanges } from "./access-policy.mjs";
 import { reportRows, downloadReport, driverMessage } from "./supervisor-report.mjs";
-const APP_VERSION = "ver1.5.4";
+const APP_VERSION = "ver1.5.5";
 const ROOT_ADMIN_UID = "Bg6iUrQS9cg4irQ3QAtG5VFDR8E2";
 const ROOT_ADMIN_EMAIL = "mhafize@jkr.gov.my";
 const DEVELOPMENT_PREVIEW = ["localhost", "127.0.0.1", ""].includes(location.hostname) && new URLSearchParams(location.search).get("live") !== "1";
@@ -697,7 +697,7 @@ function renderCalendarEvent(booking) {
 function renderVehicleItem(vehicle) {
   const availability = vehicleAvailability(vehicle.id);
   const color = vehicleColor(vehicle.id);
-  const phone = whatsappNumber(vehicle.supervisorPhone);
+  const phone = vehicle.restrictedUse === true ? "" : whatsappNumber(vehicle.supervisorPhone);
   return `
     <article class="vehicle-item vehicle-calendar-button" style="--vehicle-color: ${color}">
       <button type="button" class="vehicle-title vehicle-calendar-trigger" data-calendar-vehicle="${escapeAttr(vehicle.id)}"
@@ -708,7 +708,7 @@ function renderVehicleItem(vehicle) {
       <span class="vehicle-meta">${escapeHtml(vehicle.projectLocation ?? ([vehicle.projectDistrict, vehicle.projectState].filter(Boolean).join(", ") || "Lokasi belum ditetapkan")) || "Lokasi belum ditetapkan"}</span>
       <span class="record-meta">Penyelia: ${escapeHtml(vehicle.supervisorName || "-")}<br>No. telefon: ${phone
         ? `<a class="supervisor-whatsapp" href="https://wa.me/${phone}" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" aria-label="WhatsApp ${escapeAttr(vehicle.supervisorName || "penyelia")}">${escapeHtml(vehicle.supervisorPhone)}</a>`
-        : escapeHtml(vehicle.supervisorPhone || "-")}</span>
+        : vehicle.restrictedUse === true ? "Tidak tersedia (Penggunaan Terhad)" : escapeHtml(vehicle.supervisorPhone || "-")}</span>
       <span class="vehicle-usage"><span class="record-meta">Status Penggunaan</span><span class="status-chip ${availability.key}">${escapeHtml(availability.label)}</span></span>
       ${availability.booking ? `
         <span class="record-meta">${escapeHtml(availability.booking.destination || "-")}</span>
