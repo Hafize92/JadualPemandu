@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { reportRows, driverMessage } from "../supervisor-report.mjs";
 test("driver message follows requested order and includes odometer request", () => {
   const message = driverMessage({ registrationNo: "JXE 5238" }, { startAt: "2026-09-11T09:00", endAt: "2026-09-11T17:00", destination: "Melaka", userName: "Hafize", purpose: "Mesyuarat" });
-  assert.equal(message, "JXE 5238\nMelaka\n11/9/2026\n9.00 Pagi Bertolak - 5.00 Petang Balik\nHafize\nMesyuarat\n\nSila nyatakan bacaan odometer sebelum dan selepas penggunaan ini.");
-  assert.match(driverMessage({}, { startAt: "2026-09-11T09:00", endAt: "2026-09-12T17:00" }), /11\/9\/2026 hingga 12\/9\/2026/);
+  assert.equal(message, "1. *(11/9/2026 JUM)*\n\n\u23f0jam pergi = 9:00Pagi\n\u23f0jam pulang = 5:00Petang\n\n\ud83d\udcccMelaka\n\n\ud83d\udc64Hafize (Mesyuarat)\n\nSila nyatakan bacaan odometer sebelum dan selepas penggunaan ini.");
+  assert.match(driverMessage({}, { startAt: "2026-09-11T09:00", endAt: "2026-09-12T17:00" }), /jam pulang = 5:00Petang \(12\/9\/2026\)/);
 });
 test("monthly template includes blank days, separate user and blank signature", () => {
   const rows = reportRows([{ vehicleId: "a", startAt: "2026-09-09T10:00", endAt: "2026-09-09T11:00", driverName: "Driver", destination: "Site" }], "a", "2026-09");

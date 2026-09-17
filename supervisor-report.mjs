@@ -35,10 +35,13 @@ export function driverMessage(vehicle, booking) {
   const start = dayKey(booking.startAt);
   const end = dayKey(booking.endAt);
   const date = key => key ? key.split("-").reverse().map(Number).join("/") : "-";
-  return [vehicle.registrationNo || "-", booking.destination || "-",
-    start === end ? date(start) : `${date(start)} hingga ${date(end)}`,
-    `${time(booking.startAt)} Bertolak - ${time(booking.endAt)} Balik`,
-    booking.userName || booking.officerName || "-", booking.purpose || "-", "",
+  const weekday = start ? new Intl.DateTimeFormat("ms-MY", { weekday: "short", timeZone: zone }).format(new Date(`${start}T12:00:00+08:00`)).toUpperCase() : "-";
+  const clock = value => time(value).replace(".", ":").replace(" ", "");
+  return [`1. *(${date(start)} ${weekday})*`, "",
+    `\u23f0jam pergi = ${clock(booking.startAt)}`,
+    `\u23f0jam pulang = ${clock(booking.endAt)}${start !== end ? ` (${date(end)})` : ""}`, "",
+    `\ud83d\udccc${booking.destination || "-"}`, "",
+    `\ud83d\udc64${booking.userName || booking.officerName || "-"} (${booking.purpose || "-"})`, "",
     "Sila nyatakan bacaan odometer sebelum dan selepas penggunaan ini."].join("\n");
 }
 let excelReady;
