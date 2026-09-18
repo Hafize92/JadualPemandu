@@ -23,7 +23,7 @@ export function reportRows(bookings, vehicleId, month) {
     const weekend = [0, 6].includes(date.getUTCDay());
     const matches = bookings.filter(b => b.vehicleId === vehicleId && dayKey(b.startAt) <= key && dayKey(b.endAt) >= key && dayKey(b.startAt)).sort((a, b) => a.startAt.localeCompare(b.startAt));
     for (const b of matches.length ? matches : [null]) {
-      rows.push({ booking: b, weekend, values: [weekend && !b ? "" : ++number,
+      rows.push({ dateKey: key, booking: b, weekend, values: [weekend && !b ? "" : ++number,
         new Intl.DateTimeFormat("ms-MY", { timeZone: zone, weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(date).replace(", ", ",\n"),
         b?.userName || b?.officerName || "", b && dayKey(b.startAt) === key ? time(b.startAt) : "", b && dayKey(b.endAt) === key ? time(b.endAt) : "",
         b?.destination || "", b?.purpose || "", b?.userName || b?.officerName || "", "", b?.mileage ?? "", b?.notes || ""] });
@@ -34,6 +34,12 @@ export function reportRows(bookings, vehicleId, month) {
 export function usageRows(bookings, vehicleId, month) {
   return reportRows(bookings, vehicleId, month).filter(row => row.booking)
     .map((row, index) => ({ ...row, values: [index + 1, ...row.values.slice(1)] }));
+}
+export function dailyReportRows(bookings, vehicleId, date) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("Tarikh tidak sah.");
+  const rows = reportRows(bookings, vehicleId, date.slice(0, 7)).filter(row => row.dateKey === date);
+  if (!rows.length) throw new Error("Tarikh tidak sah.");
+  return rows.map((row, i) => ({ ...row, values: [row.booking ? i + 1 : "", ...row.values.slice(1)] }));
 }
 export function driverWhatsAppUrl(phone, message, mobile = false) {
   if (!/^601\d{8,9}$/.test(phone)) throw new Error("Invalid driver phone");
@@ -54,7 +60,7 @@ export function driverMessage(vehicle, booking) {
     "Sila nyatakan bacaan odometer sebelum dan selepas penggunaan ini."].join("\n");
 }
 let excelReady;
-export async function downloadReport(vehicle, month, rows) {
+export async function downloadReport(vehicle, month, rows, selectedDate = "") {
   if (!excelReady) excelReady = new Promise((resolve, reject) => {
     const script = document.createElement("script");
     script.src = "https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js";
@@ -63,15 +69,17 @@ export async function downloadReport(vehicle, month, rows) {
     document.head.append(script);
   });
   await excelReady;
-  const response = await fetch(new URL("./jkr-report-logo.png", import.meta.url));
-  if (!response.ok) throw new Error("Logo laporan gagal dimuat. Sila cuba semula.");
-  const bytes = new Uint8Array(await response.arrayBuffer());
   let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  const book = buildReportWorkbook(window.ExcelJS, vehicle, month, rows, btoa(binary));
+  if (!selectedDate) {
+    const response = await fetch(new URL("./jkr-report-logo.png", import.meta.url));
+    if (!response.ok) throw new Error("Logo laporan gagal dimuat. Sila cuba semula.");
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+  }
+  const book = buildReportWorkbook(window.ExcelJS, vehicle, month, rows, btoa(binary), selectedDate);
   const blob = new Blob([await book.xlsx.writeBuffer()], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a"); a.href = url; a.download = `Rekod-${vehicle.registrationNo.replace(/[^a-z0-9]/gi, "")}-${month}.xlsx`;
+  const a = document.createElement("a"); a.href = url; a.download = `Rekod-${vehicle.registrationNo.replace(/[^a-z0-9]/gi, "")}-${selectedDate || month}.xlsx`;
   document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
@@ -151,15 +159,19 @@ function addAnnualConfirmation(book, vehicle, year) {
   }
 }
 
-export function buildReportWorkbook(ExcelJS, vehicle, month, rows, logo) {
+export function buildReportWorkbook(ExcelJS, vehicle, month, rows, logo, selectedDate = "") {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error("Bulan laporan tidak sah.");
+  if (selectedDate) {
+    dailyReportRows([], vehicle.id, selectedDate);
+    if (selectedDate.slice(0, 7) !== month || rows.some(row => row.dateKey !== selectedDate)) throw new Error("Tarikh rekod tidak sepadan.");
+  }
   const book = new ExcelJS.Workbook();
-  addCover(book, vehicle, logo);
+  if (!selectedDate) addCover(book, vehicle, logo);
   const sheet = book.addWorksheet("Rekod Penggunaan", { views: [{ state: "frozen", ySplit: 5 }], pageSetup: { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: "1:5" } });
   sheet.columns = [7, 29, 25, 16, 16, 32, 32, 24, 20, 22, 35].map(width => ({ width }));
   sheet.mergeCells("A1:K1"); sheet.getCell("A1").value = "REKOD PENGGUNAAN KENDERAAN";
   sheet.mergeCells("A2:K2"); sheet.getCell("A2").value = `${vehicle.registrationNo} (${vehicle.model})`;
-  sheet.mergeCells("A3:K3"); sheet.getCell("A3").value = new Intl.DateTimeFormat("ms-MY", { month: "long", year: "numeric" }).format(new Date(`${month}-01T12:00:00`));
+  sheet.mergeCells("A3:K3"); sheet.getCell("A3").value = new Intl.DateTimeFormat("ms-MY", { ...(selectedDate ? { weekday: "long", day: "numeric" } : {}), month: "long", year: "numeric" }).format(new Date(`${selectedDate || `${month}-01`}T12:00:00`));
   for (const col of ["A", "B", "C", "F", "G", "J", "K"]) sheet.mergeCells(`${col}4:${col}5`);
   sheet.mergeCells("D4:E4"); sheet.getCell("D4").value = "Masa";
   sheet.mergeCells("H4:I4"); sheet.getCell("H4").value = "Nama dan Tandatangan Pegawai Yang Mengguna";
@@ -176,6 +188,6 @@ export function buildReportWorkbook(ExcelJS, vehicle, month, rows, logo) {
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: color } };
     }
   });
-  addAnnualConfirmation(book, vehicle, month.slice(0, 4));
+  if (!selectedDate) addAnnualConfirmation(book, vehicle, month.slice(0, 4));
   return book;
 }

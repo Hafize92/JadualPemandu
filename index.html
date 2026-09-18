@@ -10,7 +10,7 @@
       name="description"
       content="Rekod live penggunaan kereta projek, jadual pemandu, dashboard penyelia, dan dashboard admin."
     >
-    <link rel="stylesheet" href="styles.css?v=ver1.6.1">
+    <link rel="stylesheet" href="styles.css?v=ver1.6.2">
   </head>
   <body class="notice-pending">
     <dialog id="usageNotice" aria-labelledby="usageNoticeTitle" aria-describedby="usageNoticeText">
@@ -145,6 +145,10 @@
                 <label>Kenderaan<select id="reportVehicle"></select></label>
                 <label>Bulan<input id="reportMonth" type="month" required></label>
                 <button id="downloadReport" class="primary-button" type="button">Muat Turun Excel</button>
+              </div>
+              <div class="report-controls">
+                <label>Tarikh Pilihan<input id="reportDate" type="date" required></label>
+                <button id="downloadDailyReport" class="ghost-button" type="button">Muat Turun Excel (Tarikh Pilihan)</button>
               </div>
               <div class="table-wrap">
                 <table class="supervisor-report">
@@ -335,10 +339,10 @@
         <button type="button" class="ghost-button" id="closePasswordDialog">Batal</button>
       </form>
     </dialog>
-    <div class="version-pill" aria-label="Versi aplikasi">Hafize | ver1.6.1</div>
+    <div class="version-pill" aria-label="Versi aplikasi">Hafize | ver1.6.2</div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="firebase-config.js?v=ver1.6.1"></script>
-    <script type="module" src="app.js?v=ver1.6.1"></script>
+    <script src="firebase-config.js?v=ver1.6.2"></script>
+    <script type="module" src="app.js?v=ver1.6.2"></script>
   </body>
 </html>
