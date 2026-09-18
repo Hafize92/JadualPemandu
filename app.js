@@ -1,6 +1,6 @@
 import { buildAccessChanges } from "./access-policy.mjs";
-import { reportRows, usageRows, downloadReport, driverMessage, driverWhatsAppUrl } from "./supervisor-report.mjs";
-const APP_VERSION = "ver1.6.0";
+import { reportRows, usageRows, downloadReport, driverMessage, driverWhatsAppUrl } from "./supervisor-report.mjs?v=ver1.6.1";
+const APP_VERSION = "ver1.6.1";
 const ROOT_ADMIN_UID = "Bg6iUrQS9cg4irQ3QAtG5VFDR8E2";
 const ROOT_ADMIN_EMAIL = "mhafize@jkr.gov.my";
 const DEVELOPMENT_PREVIEW = ["localhost", "127.0.0.1", ""].includes(location.hostname) && new URLSearchParams(location.search).get("live") !== "1";

@@ -12,6 +12,15 @@ const vehicle = { id: "test", model: "HONDA CRV", registrationNo: "JXE 5238",
   driverName: "NAMA PEMANDU CONTOH", driverPhone: "", supervisorName: "NAMA PENYELIA CONTOH" };
 const logo = readFileSync(new URL("../jkr-report-logo.png", import.meta.url)).toString("base64");
 
+test("both roles share the workbook download and report module is versioned", () => {
+  const app = readFileSync(new URL("../app.js", import.meta.url), "utf8");
+  const version = app.match(/const APP_VERSION = "([^"]+)"/)[1];
+  assert.ok(app.includes(`from "./supervisor-report.mjs?v=${version}"`));
+  const handler = app.slice(app.indexOf('document.getElementById("downloadReport").addEventListener'), app.indexOf('els.resetBookingForm.addEventListener'));
+  assert.ok(handler.includes('if (!(isAdmin() || isSupervisor())) return;'));
+  assert.ok(handler.includes('downloadReport(vehicle, month, reportRows(state.bookings, vehicle.id, month))'));
+});
+
 test("workbook includes editable cover, complete monthly usage and one-page annual confirmation", async () => {
   const book = buildReportWorkbook(ExcelJS, vehicle, "2026-09", reportRows([], "test", "2026-09"), logo);
   const restored = new ExcelJS.Workbook();
