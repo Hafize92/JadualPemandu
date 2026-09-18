@@ -10,7 +10,7 @@
       name="description"
       content="Rekod live penggunaan kereta projek, jadual pemandu, dashboard penyelia, dan dashboard admin."
     >
-    <link rel="stylesheet" href="styles.css?v=ver1.5.9">
+    <link rel="stylesheet" href="styles.css?v=ver1.6.0">
   </head>
   <body class="notice-pending">
     <dialog id="usageNotice" aria-labelledby="usageNoticeTitle" aria-describedby="usageNoticeText">
@@ -207,6 +207,8 @@
                   <input type="text" id="vehicleProject" required>
                 </label>
                 <label>Lokasi Projek<input type="text" id="vehicleLocation" placeholder="Daerah, Negeri"></label>
+                <label>No. Kontrak<input type="text" id="vehicleContractNo"></label>
+                <label>Kontraktor<input type="text" id="vehicleContractor"></label>
                 <label>
                   Nama Pemandu
                   <input type="text" id="vehicleDriver" required>
@@ -333,10 +335,10 @@
         <button type="button" class="ghost-button" id="closePasswordDialog">Batal</button>
       </form>
     </dialog>
-    <div class="version-pill" aria-label="Versi aplikasi">Hafize | ver1.5.9</div>
+    <div class="version-pill" aria-label="Versi aplikasi">Hafize | ver1.6.0</div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="firebase-config.js?v=ver1.5.9"></script>
-    <script type="module" src="app.js?v=ver1.5.9"></script>
+    <script src="firebase-config.js?v=ver1.6.0"></script>
+    <script type="module" src="app.js?v=ver1.6.0"></script>
   </body>
 </html>

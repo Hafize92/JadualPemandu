@@ -4,3 +4,4 @@
 firebase-debug.log
 *.local
 node_modules/
+tmp/

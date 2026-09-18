@@ -1,5 +1,8 @@
 # NADI Pemandu
 
+Excel report logo: `jkr-report-logo.png`, supplied by the user as `JKR.png`.
+Preserved without alteration for the Muka Depan template.
+
 JKR logo downloaded from the official JKR Pulau Pinang website:
 https://jkr.penang.gov.my/images/2026/04/23/jkr-malaysia.png
 

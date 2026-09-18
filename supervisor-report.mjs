@@ -63,7 +63,98 @@ export async function downloadReport(vehicle, month, rows) {
     document.head.append(script);
   });
   await excelReady;
-  const book = new window.ExcelJS.Workbook();
+  const response = await fetch(new URL("./jkr-report-logo.png", import.meta.url));
+  if (!response.ok) throw new Error("Logo laporan gagal dimuat. Sila cuba semula.");
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  const book = buildReportWorkbook(window.ExcelJS, vehicle, month, rows, btoa(binary));
+  const blob = new Blob([await book.xlsx.writeBuffer()], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = `Rekod-${vehicle.registrationNo.replace(/[^a-z0-9]/gi, "")}-${month}.xlsx`;
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+function mergedText(sheet, range, value, size = 11, horizontal = "left") {
+  sheet.mergeCells(range);
+  const cell = sheet.getCell(range.split(":")[0]);
+  cell.value = value || "";
+  cell.font = { name: "Arial", size, bold: true };
+  cell.alignment = { horizontal, vertical: "middle", wrapText: true };
+  return cell;
+}
+
+function addCover(book, vehicle, logo) {
+  const sheet = book.addWorksheet("Muka Depan", {
+    views: [{ showGridLines: false }],
+    pageSetup: { paperSize: 1, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 1,
+      printArea: "A1:N24", horizontalCentered: true, verticalCentered: true,
+      margins: { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5, header: 0, footer: 0 } }
+  });
+  sheet.columns = Array.from({ length: 14 }, () => ({ width: 8 }));
+  for (let r = 1; r <= 24; r++) sheet.getRow(r).height = 20;
+  // Border is on the outside cells, leaving the editable text areas unframed.
+  for (let r = 1; r <= 24; r++) for (let c = 1; c <= 14; c++) {
+    const border = {};
+    for (const [side, edge] of [["top", r === 1], ["bottom", r === 24], ["left", c === 1], ["right", c === 14]]) {
+      if (edge) border[side] = { style: "double", color: { argb: "FF000000" } };
+    }
+    sheet.getCell(r, c).border = border;
+  }
+  const imageId = book.addImage({ base64: logo, extension: "png" });
+  sheet.addImage(imageId, { tl: { nativeCol: 4, nativeColOff: 433388, nativeRow: 1, nativeRowOff: 101600 }, ext: { width: 275, height: 205 }, editAs: "oneCell" });
+  mergedText(sheet, "B11:M12", "JABATAN KERJA RAYA MALAYSIA", 16, "center");
+  mergedText(sheet, "B13:M14", "BUKU LOG KENDERAAN", 21, "center");
+  mergedText(sheet, "B16:F18", "NAMA PROJEK:");
+  mergedText(sheet, "G16:M18", vehicle.projectName);
+  for (const [row, label, value] of [
+    [20, "NO. KONTRAK:", vehicle.contractNo],
+    [21, "KONTRAKTOR:", vehicle.contractor],
+    [22, "NAMA PEMANDU DAN NO. (H/P):", [vehicle.driverName, vehicle.driverPhone].filter(Boolean).join(" / ")],
+    [23, "NO.PENDAFTARAN:", vehicle.registrationNo]
+  ]) {
+    mergedText(sheet, `B${row}:F${row}`, label, 10);
+    mergedText(sheet, `G${row}:M${row}`, value, 10);
+  }
+}
+
+function addAnnualConfirmation(book, vehicle, year) {
+  const sheet = book.addWorksheet("Pengesahan", {
+    views: [{ showGridLines: false }],
+    pageSetup: { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 1,
+      printArea: "A1:E19", horizontalCentered: true,
+      margins: { left: 0.2, right: 0.2, top: 0.3, bottom: 0.3, header: 0, footer: 0 } }
+  });
+  sheet.columns = [7, 25, 29, 38, 37].map(width => ({ width }));
+  mergedText(sheet, "A1:E1", "Lampiran 8", 9, "right");
+  mergedText(sheet, "A2:E2", "(kepada SA KPKR Bil 3/2017)", 9, "right");
+  const title = mergedText(sheet, "A3:E3", "PENGESAHAN DAN SEMAKAN BULANAN", 11, "center");
+  title.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDDF0D2" } };
+  title.border = Object.fromEntries(["top", "bottom", "left", "right"].map(side => [side, { style: "medium" }]));
+  mergedText(sheet, "A4:C4", `JENIS KENDERAAN: ${vehicle.model || ""}`, 9);
+  mergedText(sheet, "D4:E4", `NO.PENDAFTARAN KENDERAAN: ${vehicle.registrationNo || ""}`, 9);
+  mergedText(sheet, "A6:C6", `PEGAWAI YANG BERTANGGUNGJAWAB : ${vehicle.supervisorName || ""}`, 9);
+  mergedText(sheet, "D6:E6", "NAMA PEJABAT: CAWANGAN KEJURUTERAAN AWAM DAN STRUKTUR", 9);
+  const months = ["JANUARI", "FEBRUARI", "MAC", "APRIL", "MEI", "JUN", "JULAI", "OGOS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DISEMBER"];
+  sheet.getRow(7).values = ["Bil.", "Bulan / Tahun", "Disemak Oleh", "Tandatangan & Cop", "Ulasan / Catatan"];
+  months.forEach((month, i) => { sheet.getRow(i + 8).values = [i + 1, `${month} / ${year}`, "", "", ""]; });
+  for (let r = 1; r <= 19; r++) {
+    sheet.getRow(r).height = r <= 2 ? 14 : r === 5 ? 10 : r === 6 ? 30 : r === 7 ? 30 : r >= 8 ? 29 : 22;
+    if (r < 7) continue;
+    for (let c = 1; c <= 5; c++) {
+      const cell = sheet.getCell(r, c);
+      cell.font = { name: "Arial", size: 10, bold: r === 7 || c === 2 };
+      cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+      cell.border = Object.fromEntries(["top", "bottom", "left", "right"].map(side => [side, { style: r === 7 ? "medium" : "thin", color: { argb: "FF000000" } }]));
+      if (r === 7) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9D9D9" } };
+    }
+  }
+}
+
+export function buildReportWorkbook(ExcelJS, vehicle, month, rows, logo) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error("Bulan laporan tidak sah.");
+  const book = new ExcelJS.Workbook();
+  addCover(book, vehicle, logo);
   const sheet = book.addWorksheet("Rekod Penggunaan", { views: [{ state: "frozen", ySplit: 5 }], pageSetup: { paperSize: 9, orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: "1:5" } });
   sheet.columns = [7, 29, 25, 16, 16, 32, 32, 24, 20, 22, 35].map(width => ({ width }));
   sheet.mergeCells("A1:K1"); sheet.getCell("A1").value = "REKOD PENGGUNAAN KENDERAAN";
@@ -85,8 +176,6 @@ export async function downloadReport(vehicle, month, rows) {
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: color } };
     }
   });
-  const blob = new Blob([await book.xlsx.writeBuffer()], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a"); a.href = url; a.download = `Rekod-${vehicle.registrationNo.replace(/[^a-z0-9]/gi, "")}-${month}.xlsx`;
-  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
+  addAnnualConfirmation(book, vehicle, month.slice(0, 4));
+  return book;
 }
