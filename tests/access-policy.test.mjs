@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildAccessChanges, ADMIN_EMAIL } from "../access-policy.mjs";
+import { buildAccessChanges, buildRevokeChanges, ADMIN_EMAIL } from "../access-policy.mjs";
 const old = { email: "old@example.com", role: "supervisor", displayName: "Old", allowedVehicleIds: ["car"], disabled: false };
 const vehicle = { id: "car", supervisorEmail: old.email };
 const input = { email: "new@example.com", displayName: "New", phone: "0123456789", disabled: false, allowedVehicleIds: ["car"] };
@@ -21,8 +21,22 @@ test("moving a car to another supervisor removes prior assignment", () => {
 test("disabled flag is preserved and no password enters access documents", () => {
   const changes = buildAccessChanges([], [vehicle], "", { ...input, disabled: true, password: "never-save-this", role: "admin" });
   assert.equal(changes[0].data.disabled, true);
-  assert.equal(changes[0].data.role, "supervisor");
+  assert.equal(changes[0].data.role, "admin");
   assert.equal(JSON.stringify(changes).includes("never-save-this"), false);
+});
+
+test("additional admin role is supported, invalid roles rejected", () => {
+  assert.equal(buildAccessChanges([], [], "", { ...input, role: "admin", allowedVehicleIds: [] })[0].data.role, "admin");
+  assert.throws(() => buildAccessChanges([], [], "", { ...input, role: "owner", allowedVehicleIds: [] }));
+});
+test("revocation disables access, unlinks owned cars, and never touches bookings", () => {
+  const writes = buildRevokeChanges([old], [vehicle, { id: "other", supervisorEmail: "other@example.com" }], old.email);
+  assert.equal(writes.length, 2);
+  assert.equal(writes[0].data.disabled, true);
+  assert.deepEqual(writes[0].data.allowedVehicleIds, []);
+  assert.equal(writes[1].data.supervisorEmail, "");
+  assert.ok(writes.every(w => w.collection !== "bookings"));
+  assert.throws(() => buildRevokeChanges([{ email: ADMIN_EMAIL }], [], ADMIN_EMAIL));
 });
 test("reject malformed input and duplicate approved emails", () => {
   for (const patch of [{ email: "x/y@example.com" }, { email: "bad" }, { disabled: "false" }, { allowedVehicleIds: ["missing"] }]) assert.throws(() => buildAccessChanges([], [vehicle], "", { ...input, ...patch }));

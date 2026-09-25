@@ -5,13 +5,15 @@ export function buildAccessChanges(grants, vehicles, previousEmail, input) {
   const name = String(input.displayName || "").trim();
   const phone = String(input.phone || "").trim();
   const ids = input.allowedVehicleIds;
+  const role = input.role || "supervisor";
+  if (!["supervisor", "admin"].includes(role)) throw new Error("Peranan tidak sah.");
   if (email === ADMIN_EMAIL || previousEmail === ADMIN_EMAIL) throw new Error("Akaun Admin utama dilindungi.");
   if (!/^[^\s@/]+@[^\s@/]+\.[^\s@/]+$/.test(email) || email.length > 254) throw new Error("Emel tidak sah.");
   if (!name || name.length > 100) throw new Error("Nama diperlukan (maksimum 100 aksara).");
   if (phone.length > 30 || (phone && !/^\+?[\d\s()-]+$/.test(phone))) throw new Error("No. telefon tidak sah.");
   if (typeof input.disabled !== "boolean" || !Array.isArray(ids) || ids.length > 30 || ids.some(id => !vehicles.some(v => v.id === id))) throw new Error("Pilihan akses tidak sah.");
   if (previousEmail !== email && grants.some(g => g.email === email)) throw new Error("Emel sudah diluluskan. Edit rekod sedia ada.");
-  const profile = { email, displayName: name, phone, disabled: input.disabled, role: "supervisor", allowedVehicleIds: [...new Set(ids)] };
+  const profile = { email, displayName: name, phone, disabled: input.disabled, role, allowedVehicleIds: [...new Set(ids)] };
   const writes = [{ collection: "access", id: email, data: profile }];
   for (const grant of grants) {
     if (grant.email === email) continue;
@@ -24,4 +26,13 @@ export function buildAccessChanges(grants, vehicles, previousEmail, input) {
     else if (vehicle.supervisorEmail && [previousEmail, email].includes(vehicle.supervisorEmail.toLowerCase())) writes.push({ collection: "vehicles", id: vehicle.id, data: { supervisorEmail: "", supervisorName: "", supervisorPhone: "", supervisorId: "" } });
   }
   return writes;
+}
+
+export function buildRevokeChanges(grants, vehicles, email) {
+  const grant = grants.find(item => item.email === email);
+  if (!grant || email === ADMIN_EMAIL) throw new Error("Akses ini tidak boleh dibuang.");
+  // Keep a disabled grant so legacy-profile import cannot restore revoked privileges.
+  return [{ collection: "access", id: email, data: { ...grant, disabled: true, allowedVehicleIds: [] } },
+    ...vehicles.filter(v => v.supervisorEmail?.toLowerCase() === email).map(v => ({ collection: "vehicles", id: v.id,
+      data: { supervisorEmail: "", supervisorName: "", supervisorPhone: "", supervisorId: "" } }))];
 }

@@ -1,6 +1,6 @@
-import { buildAccessChanges } from "./access-policy.mjs";
-import { reportRows, dailyReportRows, usageRows, downloadReport, driverMessage, driverWhatsAppUrl } from "./supervisor-report.mjs?v=ver1.7.0";
-const APP_VERSION = "ver1.7.0";
+import { buildAccessChanges, buildRevokeChanges } from "./access-policy.mjs?v=ver1.8.0";
+import { reportRows, dailyReportRows, usageRows, downloadReport, driverMessage, driverWhatsAppUrl } from "./supervisor-report.mjs?v=ver1.8.0";
+const APP_VERSION = "ver1.8.0";
 const ROOT_ADMIN_UID = "Bg6iUrQS9cg4irQ3QAtG5VFDR8E2";
 const ROOT_ADMIN_EMAIL = "mhafize@jkr.gov.my";
 const DEVELOPMENT_PREVIEW = ["localhost", "127.0.0.1", ""].includes(location.hostname) && new URLSearchParams(location.search).get("live") !== "1";
@@ -120,6 +120,7 @@ function cacheElements() {
 }
 
 function bindEvents() {
+  document.getElementById("cancelAdminConfirm").addEventListener("click", () => document.getElementById("adminConfirmDialog").close());
   els.vehicleStatusList.addEventListener("click", (event) => {
     const vehicle = event.target.closest("[data-calendar-vehicle]");
     if (!vehicle) return;
@@ -322,14 +323,7 @@ function subscribeUserProfile(user) {
   if (user.uid === ROOT_ADMIN_UID && user.email?.toLowerCase() === ROOT_ADMIN_EMAIL) {
     state.profile = { id: ROOT_ADMIN_UID, displayName: "Hafize", email: ROOT_ADMIN_EMAIL, role: "admin" };
     importLegacyAccess().catch(error => showToast(readableFirebaseError(error)));
-    state.usersUnsubscribe = onSnapshot(collection(state.db, "access"), (snapshot) => {
-      state.users = snapshot.docs.map(item => ({ ...item.data(), id: item.id }));
-      renderAdmin();
-    }, error => showToast(readableFirebaseError(error)));
-    state.requestsUnsubscribe = onSnapshot(collection(state.db, "registrationRequests"), snapshot => {
-      state.registrationRequests = snapshot.docs.map(item => ({ ...item.data(), id: item.id }));
-      renderAdmin();
-    }, error => showToast(readableFirebaseError(error)));
+    syncAdminSubscriptions();
     return;
   }
   if (!user.emailVerified) return;
@@ -344,8 +338,25 @@ function subscribeUserProfile(user) {
           allowedVehicleIds: []
         };
 
+    syncAdminSubscriptions();
     renderAll();
-  }, () => { state.profile = null; renderAll(); });
+  }, () => { state.profile = null; syncAdminSubscriptions(); renderAll(); });
+}
+
+function syncAdminSubscriptions() {
+  if (!isAdmin()) {
+    state.usersUnsubscribe?.(); state.requestsUnsubscribe?.();
+    state.usersUnsubscribe = null; state.requestsUnsubscribe = null;
+    state.users = []; state.registrationRequests = [];
+    return;
+  }
+  const { collection, onSnapshot } = state.sdk;
+  if (!state.usersUnsubscribe) state.usersUnsubscribe = onSnapshot(collection(state.db, "access"), snapshot => {
+    state.users = snapshot.docs.map(item => ({ ...item.data(), id: item.id })); renderAdmin();
+  }, error => showToast(readableFirebaseError(error)));
+  if (!state.requestsUnsubscribe) state.requestsUnsubscribe = onSnapshot(collection(state.db, "registrationRequests"), snapshot => {
+    state.registrationRequests = snapshot.docs.map(item => ({ ...item.data(), id: item.id })); renderAdmin();
+  }, error => showToast(readableFirebaseError(error)));
 }
 
 async function importLegacyAccess() {
@@ -948,7 +959,7 @@ function renderAdminUserRow(user) {
       <td>${escapeHtml(user.email || "-")}</td>
       <td><span class="role-chip">${escapeHtml(roleLabel(user.role))}</span></td>
       <td>${escapeHtml((user.allowedVehicleIds || []).map(id => vehicleLabel(findVehicle(id), id)).join(", ") || "-")}</td>
-      <td>${user.id === ROOT_ADMIN_UID || user.role === "admin" ? "Admin utama" : `<span>${user.disabled ? "Tidak aktif" : "Aktif"}</span><div class="row-actions"><button type="button" class="ghost-button small" data-user-action="edit" data-id="${escapeAttr(user.id)}">Edit akses</button><button type="button" class="ghost-button small" data-user-action="reset" data-id="${escapeAttr(user.id)}">Hantar emel reset</button></div>`}</td>
+      <td>${user.id === ROOT_ADMIN_UID || user.email === ROOT_ADMIN_EMAIL ? "Penyedia aplikasi (dilindungi)" : `<span>${user.disabled ? "Tidak aktif" : "Aktif"}</span><div class="row-actions"><button type="button" class="ghost-button small" data-user-action="edit" data-id="${escapeAttr(user.id)}">Edit akses</button><button type="button" class="ghost-button small" data-user-action="reset" data-id="${escapeAttr(user.id)}">Hantar emel reset</button>${!user.disabled ? `<button type="button" class="danger-button small" data-user-action="revoke" data-id="${escapeAttr(user.id)}">Buang Akses</button>` : ""}</div>`}</td>
     </tr>
   `;
 }
@@ -1253,12 +1264,17 @@ async function handleUserSubmit(event) {
     email: els.userEmail.value.trim().toLowerCase(),
     phone: document.getElementById("userPhone").value.trim(),
     disabled: document.getElementById("userDisabled").checked,
+    role: document.getElementById("userRole").value,
     allowedVehicleIds: [...els.userVehicles.selectedOptions].map(option => option.value)
   };
 
   try {
+    const writes = buildAccessChanges(state.users, state.vehicles, uid, payload);
+    const previous = state.users.find(user => user.id === uid);
+    if (payload.role === "admin" || previous?.role === "admin") {
+      if (!await confirmAdminPassword()) return;
+    }
     if (state.firebaseReady) {
-      const writes = buildAccessChanges(state.users, state.vehicles, uid, payload);
       const batch = state.sdk.writeBatch(state.db);
       for (const write of writes) {
         const { id: ignored, ...data } = write.data;
@@ -1266,7 +1282,6 @@ async function handleUserSubmit(event) {
       }
       await batch.commit();
     } else {
-      const writes = buildAccessChanges(state.users, state.vehicles, uid, payload);
       for (const write of writes) {
         const list = write.collection === "access" ? state.users : state.vehicles;
         const existing = list.find(item => item.id === write.id);
@@ -1295,7 +1310,7 @@ function summaryCard(label, value) {
 function resetUserForm() {
   els.userForm.reset();
   els.userUid.value = "";
-  document.getElementById("userFormTitle").textContent = "Tambah Penyelia";
+  document.getElementById("userFormTitle").textContent = "Tambah Akses";
 }
 
 async function handleUserAction(event) {
@@ -1306,15 +1321,37 @@ async function handleUserAction(event) {
     return;
   }
   const user = state.users.find(item => item.id === button.dataset.id);
-  if (!user || user.id === ROOT_ADMIN_UID || user.role === "admin") return;
+  if (!user || user.id === ROOT_ADMIN_UID || user.email === ROOT_ADMIN_EMAIL) return;
+  if (button.dataset.userAction === "revoke") {
+    if (!confirm(`Buang akses ${user.email}? Rekod penggunaan dikekalkan. Akaun ini tidak lagi boleh mengurus sistem.`)) return;
+    button.disabled = true;
+    try {
+      if (user.role === "admin" && !await confirmAdminPassword()) return;
+      const writes = buildRevokeChanges(state.users, state.vehicles, user.email);
+      if (state.firebaseReady) {
+        const batch = state.sdk.writeBatch(state.db);
+        for (const write of writes) {
+          const { id: ignored, ...data } = write.data;
+          batch.set(state.sdk.doc(state.db, write.collection, write.id), { ...data, updatedAt: state.sdk.serverTimestamp() }, { merge: true });
+        }
+        await batch.commit();
+      } else {
+        for (const write of writes) Object.assign((write.collection === "access" ? state.users : state.vehicles).find(item => item.id === write.id), write.data);
+      }
+      resetUserForm(); renderAll(); showToast("Akses dibuang. Rekod penggunaan dikekalkan.");
+    } catch (error) { showToast(readableFirebaseError(error)); }
+    finally { button.disabled = false; }
+    return;
+  }
   if (button.dataset.userAction === "edit") {
     els.userUid.value = user.id;
     els.userName.value = user.displayName || "";
     els.userEmail.value = user.email || "";
     document.getElementById("userPhone").value = user.phone || state.vehicles.find(vehicle => vehicle.supervisorId === user.id)?.supervisorPhone || "";
     document.getElementById("userDisabled").checked = user.disabled === true;
+    document.getElementById("userRole").value = user.role || "supervisor";
     [...els.userVehicles.options].forEach(option => { option.selected = (user.allowedVehicleIds || []).includes(option.value); });
-    document.getElementById("userFormTitle").textContent = "Edit Penyelia";
+    document.getElementById("userFormTitle").textContent = "Edit Akses";
     els.userForm.scrollIntoView({ behavior: "smooth", block: "start" });
   } else if (button.dataset.userAction === "reset") {
     if (!confirm(`Hantar emel penetapan semula password kepada ${user.email}?`)) return;
@@ -1500,7 +1537,41 @@ function isSupervisor() {
 }
 
 function isAdmin() {
-  return hasWritableSession() && (DEVELOPMENT_PREVIEW ? currentRole() === "admin" : state.currentUser?.uid === ROOT_ADMIN_UID && state.currentUser?.email?.toLowerCase() === ROOT_ADMIN_EMAIL);
+  return hasWritableSession() && (DEVELOPMENT_PREVIEW ? currentRole() === "admin" :
+    (state.currentUser?.uid === ROOT_ADMIN_UID && state.currentUser?.email?.toLowerCase() === ROOT_ADMIN_EMAIL)
+    || (state.currentUser?.emailVerified && currentRole() === "admin"));
+}
+
+async function confirmAdminPassword() {
+  if (!isAdmin()) throw new Error("Akses Admin diperlukan.");
+  const dialog = document.getElementById("adminConfirmDialog");
+  const form = document.getElementById("adminConfirmForm");
+  const password = document.getElementById("adminConfirmPassword");
+  const error = document.getElementById("adminConfirmError");
+  error.textContent = "";
+  form.reset(); dialog.showModal(); password.focus();
+  return new Promise(resolve => {
+    let approved = false;
+    const close = () => { form.removeEventListener("submit", submit); form.reset(); resolve(approved); };
+    const submit = async event => {
+      event.preventDefault();
+      const button = event.submitter; button.disabled = true;
+      document.getElementById("cancelAdminConfirm").disabled = true;
+      dialog.oncancel = event => event.preventDefault();
+      try {
+        if (!DEVELOPMENT_PREVIEW) {
+          const credential = state.sdk.EmailAuthProvider.credential(state.currentUser.email, password.value);
+          await state.sdk.reauthenticateWithCredential(state.currentUser, credential);
+          await state.currentUser.getIdToken(true);
+        }
+        if (!isAdmin()) throw new Error("Akses Admin tidak lagi aktif.");
+        approved = true; dialog.close();
+      } catch (e) { error.textContent = readableFirebaseError(e); password.value = ""; }
+      finally { button.disabled = false; document.getElementById("cancelAdminConfirm").disabled = false; dialog.oncancel = null; }
+    };
+    dialog.addEventListener("close", close, { once: true });
+    form.addEventListener("submit", submit);
+  });
 }
 
 function roleLabel(role) {

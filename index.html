@@ -10,7 +10,7 @@
       name="description"
       content="Rekod live penggunaan kereta projek, jadual pemandu, dashboard penyelia, dan dashboard admin."
     >
-    <link rel="stylesheet" href="styles.css?v=ver1.7.0">
+    <link rel="stylesheet" href="styles.css?v=ver1.8.0">
   </head>
   <body class="notice-pending">
     <dialog id="usageNotice" aria-labelledby="usageNoticeTitle" aria-describedby="usageNoticeText">
@@ -251,7 +251,7 @@
               <form class="form-grid" id="userForm">
                 <label class="full">
                   <input type="hidden" id="userUid">
-                  <strong id="userFormTitle">Tambah Penyelia</strong>
+                  <strong id="userFormTitle">Tambah Akses</strong>
                 </label>
                 <label>
                   Nama
@@ -269,9 +269,10 @@
                   Kenderaan Dibenarkan
                   <select id="userVehicles" multiple size="4" aria-label="Kenderaan Dibenarkan"></select>
                 </label>
+                <label>Peranan<select id="userRole"><option value="supervisor">Penyelia</option><option value="admin">Admin</option></select></label>
                 <label class="checkbox-label"><input type="checkbox" id="userDisabled">Nyahaktifkan akses</label>
                 <button class="primary-button full" type="submit">Simpan Akses</button>
-                <button class="ghost-button full" type="button" id="resetUserForm">Penyelia Baharu</button>
+                <button class="ghost-button full" type="button" id="resetUserForm">Akses Baharu</button>
               </form>
             </section>
 
@@ -319,6 +320,15 @@
       </main>
     </div>
 
+    <dialog id="adminConfirmDialog" aria-labelledby="adminConfirmTitle">
+      <h3 id="adminConfirmTitle">Pengesahan Admin</h3>
+      <form id="adminConfirmForm" class="form-grid">
+        <label class="full">Kata laluan akaun anda<input id="adminConfirmPassword" type="password" autocomplete="current-password" required></label>
+        <p id="adminConfirmError" class="full" role="alert"></p>
+        <button class="primary-button" type="submit">Sahkan Perubahan</button>
+        <button class="ghost-button" type="button" id="cancelAdminConfirm">Batal</button>
+      </form>
+    </dialog>
     <dialog id="registerDialog" aria-labelledby="registerTitle">
       <h3 id="registerTitle">Daftar Penyelia</h3>
       <form id="registerForm" class="form-grid">
@@ -337,10 +347,10 @@
         <button type="button" class="ghost-button" id="closePasswordDialog">Batal</button>
       </form>
     </dialog>
-    <div class="version-pill" aria-label="Versi aplikasi">Hafize | ver1.7.0</div>
+    <div class="version-pill" aria-label="Versi aplikasi">Hafize | ver1.8.0</div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <script src="firebase-config.js?v=ver1.7.0"></script>
-    <script type="module" src="app.js?v=ver1.7.0"></script>
+    <script src="firebase-config.js?v=ver1.8.0"></script>
+    <script type="module" src="app.js?v=ver1.8.0"></script>
   </body>
 </html>
