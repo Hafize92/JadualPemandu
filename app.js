@@ -1,6 +1,6 @@
 import { buildAccessChanges } from "./access-policy.mjs";
-import { reportRows, dailyReportRows, usageRows, downloadReport, driverMessage, driverWhatsAppUrl } from "./supervisor-report.mjs?v=ver1.6.2";
-const APP_VERSION = "ver1.6.2";
+import { reportRows, dailyReportRows, usageRows, downloadReport, driverMessage, driverWhatsAppUrl } from "./supervisor-report.mjs?v=ver1.7.0";
+const APP_VERSION = "ver1.7.0";
 const ROOT_ADMIN_UID = "Bg6iUrQS9cg4irQ3QAtG5VFDR8E2";
 const ROOT_ADMIN_EMAIL = "mhafize@jkr.gov.my";
 const DEVELOPMENT_PREVIEW = ["localhost", "127.0.0.1", ""].includes(location.hostname) && new URLSearchParams(location.search).get("live") !== "1";
@@ -248,7 +248,7 @@ async function initFirebase() {
     const app = firebaseApp.initializeApp(config);
     state.auth = firebaseAuth.getAuth(app);
     state.db = firebaseFirestore.getFirestore(app);
-    state.sdk = { ...firebaseAuth, ...firebaseFirestore };
+    state.sdk = { ...firebaseApp, ...firebaseAuth, ...firebaseFirestore };
     state.firebaseEnabled = true;
     state.firebaseReady = true;
     state.firebaseLoading = false;
@@ -298,6 +298,9 @@ function clearPublicSubscriptions() {
 }
 
 function subscribeUserProfile(user) {
+  if (state.requestsUnsubscribe) state.requestsUnsubscribe();
+  state.requestsUnsubscribe = null;
+  state.registrationRequests = [];
   if (state.profileUnsubscribe) {
     state.profileUnsubscribe();
     state.profileUnsubscribe = null;
@@ -321,6 +324,10 @@ function subscribeUserProfile(user) {
     importLegacyAccess().catch(error => showToast(readableFirebaseError(error)));
     state.usersUnsubscribe = onSnapshot(collection(state.db, "access"), (snapshot) => {
       state.users = snapshot.docs.map(item => ({ ...item.data(), id: item.id }));
+      renderAdmin();
+    }, error => showToast(readableFirebaseError(error)));
+    state.requestsUnsubscribe = onSnapshot(collection(state.db, "registrationRequests"), snapshot => {
+      state.registrationRequests = snapshot.docs.map(item => ({ ...item.data(), id: item.id }));
       renderAdmin();
     }, error => showToast(readableFirebaseError(error)));
     return;
@@ -901,6 +908,11 @@ function renderAdmin() {
   els.adminUserRows.innerHTML = state.users.length
     ? state.users.map(renderAdminUserRow).join("")
     : `<tr><td colspan="5"><div class="empty-state">Senarai akses akan dipaparkan selepas profil admin boleh membaca koleksi users.</div></td></tr>`;
+  const pending = (state.registrationRequests || []).filter(item => item.status === "pending");
+  if (pending.length) {
+    if (!state.users.length) els.adminUserRows.innerHTML = "";
+    els.adminUserRows.insertAdjacentHTML("afterbegin", pending.map(item => `<tr><td>-</td><td>${escapeHtml(item.email)}</td><td>Permohonan Penyelia</td><td>-</td><td>Menunggu pengesahan Admin<div class="row-actions"><button class="primary-button small" type="button" data-user-action="approve-registration" data-id="${escapeAttr(item.id)}">Cipta Kata Laluan</button></div></td></tr>`).join(""));
+  }
   for (const body of [els.adminVehicleRows, els.adminUserRows]) {
     const table = body.closest("table");
     table.classList.add("mobile-record-table");
@@ -1289,6 +1301,10 @@ function resetUserForm() {
 async function handleUserAction(event) {
   const button = event.target.closest("[data-user-action]");
   if (!button || !isAdmin()) return;
+  if (button.dataset.userAction === "approve-registration") {
+    await approveRegistration(button);
+    return;
+  }
   const user = state.users.find(item => item.id === button.dataset.id);
   if (!user || user.id === ROOT_ADMIN_UID || user.role === "admin") return;
   if (button.dataset.userAction === "edit") {
@@ -1334,19 +1350,60 @@ async function handlePasswordChange(event) {
 async function handleRegistration(event) {
   event.preventDefault();
   const email = document.getElementById("registerEmail").value.trim().toLowerCase();
-  const password = document.getElementById("registerPassword").value;
   if (email === ROOT_ADMIN_EMAIL) { showToast("Admin utama menggunakan akaun sedia ada. Sila log masuk."); return; }
-  if (password !== document.getElementById("registerConfirm").value) { showToast("Password tidak sepadan."); return; }
   const submit = event.submitter;
   submit.disabled = true;
   try {
-    const result = await state.sdk.createUserWithEmailAndPassword(state.auth, email, password);
+    if (DEVELOPMENT_PREVIEW) {
+      state.registrationRequests ||= [];
+      if (!state.registrationRequests.some(item => item.id === email)) state.registrationRequests.push({ id: email, email, status: "pending" });
+    } else {
+      const { setDoc, doc, serverTimestamp } = state.sdk;
+      await setDoc(doc(state.db, "registrationRequests", email), { email, status: "pending", createdAt: serverTimestamp() });
+    }
     document.getElementById("registerDialog").close();
-    // Registration authenticates the account but never grants supervisor privileges.
-    try { await state.sdk.sendEmailVerification(result.user); showToast("Akaun didaftarkan. Semak emel pengesahan."); }
-    catch { showToast("Akaun didaftarkan. Tekan Hantar emel pengesahan untuk cuba semula."); }
-  } catch (error) { showToast(readableFirebaseError(error)); }
+    showToast("Permohonan dihantar kepada Admin. Tunggu emel untuk mencipta kata laluan selepas kelulusan.");
+  } catch (error) {
+    showToast(error.code === "permission-denied" ? "Permohonan mungkin sudah dihantar atau akses sudah wujud. Hubungi Admin; gunakan Lupa Password untuk akaun sedia ada." : readableFirebaseError(error));
+  }
   finally { submit.disabled = false; }
+}
+
+async function approveRegistration(button) {
+  const request = (state.registrationRequests || []).find(item => item.id === button.dataset.id && item.status === "pending");
+  if (!request || request.email === ROOT_ADMIN_EMAIL) return;
+  if (!confirm(`Luluskan permohonan dan hantar pautan cipta kata laluan kepada ${request.email}?`)) return;
+  button.disabled = true;
+  let secondary;
+  try {
+    if (DEVELOPMENT_PREVIEW) {
+      request.status = "approved";
+      showToast("Pratonton: permohonan diluluskan, tiada emel dihantar.");
+      renderAdmin();
+      return;
+    }
+    const sdk = state.sdk;
+    // Isolated in-memory Auth prevents account creation from replacing the Admin session.
+    secondary = sdk.initializeApp(state.auth.app.options, `registration-${crypto.randomUUID()}`);
+    const auth = sdk.initializeAuth(secondary, { persistence: sdk.inMemoryPersistence });
+    const password = Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, "0")).join("") + "aA1!";
+    try { await sdk.createUserWithEmailAndPassword(auth, request.email, password); }
+    catch (error) { if (error.code !== "auth/email-already-in-use") throw error; }
+    await sdk.signOut(auth);
+    const accessRef = sdk.doc(state.db, "access", request.email);
+    await sdk.runTransaction(state.db, async tx => {
+      const existing = await tx.get(accessRef);
+      if (!existing.exists()) tx.set(accessRef, { email: request.email, displayName: request.email,
+        role: "supervisor", disabled: false, allowedVehicleIds: [], updatedAt: sdk.serverTimestamp() });
+    });
+    await sdk.sendPasswordResetEmail(state.auth, request.email);
+    await sdk.updateDoc(sdk.doc(state.db, "registrationRequests", request.id), { status: "approved", approvedAt: sdk.serverTimestamp() });
+    showToast("Pautan cipta kata laluan dihantar. Gunakan Edit akses untuk melengkapkan nama dan menetapkan kenderaan.");
+  } catch (error) { showToast(`Belum selesai: ${readableFirebaseError(error)} Sila cuba semula; permohonan dikekalkan.`); }
+  finally {
+    if (secondary) await state.sdk.deleteApp(secondary).catch(() => {});
+    button.disabled = false;
+  }
 }
 
 function vehicleAvailability(vehicleId) {

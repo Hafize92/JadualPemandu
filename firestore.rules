@@ -57,6 +57,19 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /registrationRequests/{email} {
+      allow read: if isAdmin();
+      allow create: if email != "mhafize@jkr.gov.my"
+        && email.size() <= 254
+        && email.matches('^[a-z0-9.!#$%&*+?^_`{|}~-]+@[a-z0-9-]+([.][a-z0-9-]+)+$')
+        && request.resource.data.keys().hasOnly(['email', 'status', 'createdAt'])
+        && request.resource.data.email == email
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt == request.time
+        && !exists(/databases/$(database)/documents/access/$(email));
+      allow update, delete: if isAdmin();
+    }
+
     match /access/{email} {
       allow read: if isAdmin() || (signedIn()
         && request.auth.token.email_verified == true && request.auth.token.email == email);
