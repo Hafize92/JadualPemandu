@@ -1,0 +1,41 @@
+name: NADI Drive Backup
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 13 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: nadi-drive-backup
+  cancel-in-progress: false
+jobs:
+  backup:
+    if: vars.BACKUP_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test backup safeguards
+        run: node --test tests/backup-drive.test.mjs
+      - id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.BACKUP_WIF_PROVIDER }}
+          service_account: ${{ vars.BACKUP_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/datastore
+          create_credentials_file: false
+      - name: Export and verify backup
+        run: node scripts/backup-drive.mjs
+        env:
+          FIRESTORE_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          DRIVE_CLIENT_ID: ${{ secrets.BACKUP_DRIVE_CLIENT_ID }}
+          DRIVE_CLIENT_SECRET: ${{ secrets.BACKUP_DRIVE_CLIENT_SECRET }}
+          DRIVE_REFRESH_TOKEN: ${{ secrets.BACKUP_DRIVE_REFRESH_TOKEN }}
+          BACKUP_CLEANUP_ENABLED: ${{ vars.BACKUP_CLEANUP_ENABLED }}
