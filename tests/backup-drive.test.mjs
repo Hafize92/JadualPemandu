@@ -21,6 +21,21 @@ test('missing credentials fail before any network request', async () => {
   await assert.rejects(runBackup({}), /Missing secret/);
 });
 
+test('read check never touches Drive or performs writes', async () => {
+  const original = globalThis.fetch;
+  const calls = [];
+  try {
+    globalThis.fetch = async (url, options) => {
+      assert.equal(new URL(url).hostname, 'firestore.googleapis.com');
+      assert.equal(options.method, undefined);
+      calls.push(url);
+      return new Response(JSON.stringify({ documents: [] }));
+    };
+    await runBackup({ BACKUP_CHECK_ONLY: 'true', FIRESTORE_ACCESS_TOKEN: 'mock' });
+    assert.equal(calls.length, 5);
+  } finally { globalThis.fetch = original; }
+});
+
 test('verification gates cleanup and collection pages share one readTime', async () => {
   const original = globalThis.fetch;
   const env = Object.fromEntries(['FIRESTORE_ACCESS_TOKEN', 'DRIVE_CLIENT_ID',

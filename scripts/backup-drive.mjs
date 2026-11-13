@@ -32,6 +32,14 @@ async function request(url, token, options = {}) {
 }
 
 export async function runBackup(env = process.env) {
+  if (env.BACKUP_CHECK_ONLY === 'true') {
+    if (!env.FIRESTORE_ACCESS_TOKEN) throw new Error('Missing secret: FIRESTORE_ACCESS_TOKEN');
+    for (const collection of COLLECTIONS) {
+      await request(`https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents/${collection}?pageSize=1`, env.FIRESTORE_ACCESS_TOKEN);
+    }
+    console.log('Live Firestore read check passed for all 5 collections. No backup uploaded; no data modified.');
+    return;
+  }
   const required = ['FIRESTORE_ACCESS_TOKEN', 'DRIVE_CLIENT_ID', 'DRIVE_CLIENT_SECRET', 'DRIVE_REFRESH_TOKEN'];
   for (const key of required) if (!env[key]) throw new Error(`Missing secret: ${key}`);
   const oauth = await request('https://oauth2.googleapis.com/token', null, {

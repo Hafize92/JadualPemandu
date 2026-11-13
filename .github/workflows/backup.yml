@@ -1,6 +1,11 @@
 name: NADI Drive Backup
 on:
   workflow_dispatch:
+    inputs:
+      check_only:
+        description: Test Firestore read access only; no Drive upload or deletion
+        type: boolean
+        default: true
   schedule:
     - cron: '0 13 * * *'
 permissions:
@@ -10,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   backup:
-    if: vars.BACKUP_ENABLED == 'true'
+    if: vars.BACKUP_ENABLED == 'true' || (github.event_name == 'workflow_dispatch' && inputs.check_only)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -39,3 +44,4 @@ jobs:
           DRIVE_CLIENT_SECRET: ${{ secrets.BACKUP_DRIVE_CLIENT_SECRET }}
           DRIVE_REFRESH_TOKEN: ${{ secrets.BACKUP_DRIVE_REFRESH_TOKEN }}
           BACKUP_CLEANUP_ENABLED: ${{ vars.BACKUP_CLEANUP_ENABLED }}
+          BACKUP_CHECK_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.check_only }}
